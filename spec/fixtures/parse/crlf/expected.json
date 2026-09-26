@@ -1,0 +1,24 @@
+{
+  "lineEnding": "crlf",
+  "finalNewline": true,
+  "bom": false,
+  "headings": [
+    {
+      "line": 3,
+      "raw": "## P0 \u2014 Now",
+      "section": "P0"
+    }
+  ],
+  "items": [
+    {
+      "line": 4,
+      "section": "P0",
+      "priority": "P0",
+      "done": false,
+      "title": "Test CRLF",
+      "id": "t_999",
+      "meta": {},
+      "body": []
+    }
+  ]
+}

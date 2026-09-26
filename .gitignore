@@ -1,0 +1,16 @@
+# Personal runtime data: my actual tasks and settings. Never commit.
+data/
+
+# macOS
+.DS_Store
+
+# Node (mcp/)
+node_modules/
+dist/
+*.log
+
+# Xcode (app/)
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/

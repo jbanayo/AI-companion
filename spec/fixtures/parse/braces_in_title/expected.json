@@ -1,0 +1,24 @@
+{
+  "lineEnding": "lf",
+  "finalNewline": true,
+  "bom": false,
+  "headings": [
+    {
+      "line": 3,
+      "raw": "## P2 \u2014 Soon",
+      "section": "P2"
+    }
+  ],
+  "items": [
+    {
+      "line": 4,
+      "section": "P2",
+      "priority": "P2",
+      "done": false,
+      "title": "Fix {braces} in template",
+      "id": "t_abc1",
+      "meta": {},
+      "body": []
+    }
+  ]
+}

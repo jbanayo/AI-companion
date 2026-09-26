@@ -1,0 +1,84 @@
+{
+  "lineEnding": "lf",
+  "finalNewline": true,
+  "bom": false,
+  "headings": [
+    {
+      "line": 3,
+      "raw": "## P0 \u2014 Now",
+      "section": "P0"
+    },
+    {
+      "line": 6,
+      "raw": "## P1 \u2014 This week",
+      "section": "P1"
+    },
+    {
+      "line": 10,
+      "raw": "## P2 \u2014 Soon",
+      "section": "P2"
+    },
+    {
+      "line": 13,
+      "raw": "## P3 \u2014 Someday",
+      "section": "P3"
+    },
+    {
+      "line": 15,
+      "raw": "## Done",
+      "section": "Done"
+    }
+  ],
+  "items": [
+    {
+      "line": 4,
+      "section": "P0",
+      "priority": "P0",
+      "done": false,
+      "title": "Reply to Enzo on Prismo pricing ruling",
+      "id": "t_8f2a",
+      "meta": {
+        "due": "2026-09-27",
+        "src": "claude-code"
+      },
+      "body": []
+    },
+    {
+      "line": 7,
+      "section": "P1",
+      "priority": "P1",
+      "done": false,
+      "title": "Review Solomon extract PR #42",
+      "id": "t_1c9d",
+      "meta": {
+        "due": "2026-10-01",
+        "src": "claude-desktop"
+      },
+      "body": [
+        "Check the OCR fallback path first."
+      ]
+    },
+    {
+      "line": 11,
+      "section": "P2",
+      "priority": "P2",
+      "done": false,
+      "title": "Ask Raph for logo files",
+      "id": "t_77b0",
+      "meta": {},
+      "body": []
+    },
+    {
+      "line": 16,
+      "section": "Done",
+      "priority": "Done",
+      "done": true,
+      "title": "Push product-docs update",
+      "id": "t_0a11",
+      "meta": {
+        "done": "2026-09-25"
+      },
+      "body": []
+    }
+  ]
+}

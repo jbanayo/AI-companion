@@ -1,0 +1,39 @@
+{
+  "lineEnding": "lf",
+  "finalNewline": true,
+  "bom": false,
+  "headings": [
+    {
+      "line": 3,
+      "raw": "## P2 \u2014 Soon",
+      "section": "P2"
+    },
+    {
+      "line": 7,
+      "raw": "## Done",
+      "section": "Done"
+    }
+  ],
+  "items": [
+    {
+      "line": 4,
+      "section": "P2",
+      "priority": "P2",
+      "done": false,
+      "title": "Call the auditor",
+      "id": null,
+      "meta": {},
+      "body": []
+    },
+    {
+      "line": 5,
+      "section": "P2",
+      "priority": "P2",
+      "done": true,
+      "title": "Send invoice",
+      "id": null,
+      "meta": {},
+      "body": []
+    }
+  ]
+}

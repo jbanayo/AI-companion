@@ -1,0 +1,44 @@
+{
+  "lineEnding": "lf",
+  "finalNewline": true,
+  "bom": false,
+  "headings": [
+    {
+      "line": 3,
+      "raw": "## P1 \u2014 This week",
+      "section": "P1"
+    },
+    {
+      "line": 6,
+      "raw": "## Ideas",
+      "section": null
+    },
+    {
+      "line": 9,
+      "raw": "## Done",
+      "section": "Done"
+    }
+  ],
+  "items": [
+    {
+      "line": 4,
+      "section": "P1",
+      "priority": "P1",
+      "done": false,
+      "title": "Known priority",
+      "id": "t_001",
+      "meta": {},
+      "body": []
+    },
+    {
+      "line": 7,
+      "section": null,
+      "priority": "P2",
+      "done": false,
+      "title": "Vague future thing",
+      "id": null,
+      "meta": {},
+      "body": []
+    }
+  ]
+}
