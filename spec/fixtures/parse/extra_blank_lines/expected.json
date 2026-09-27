@@ -1,0 +1,39 @@
+{
+  "lineEnding": "lf",
+  "finalNewline": true,
+  "bom": false,
+  "headings": [
+    {
+      "line": 4,
+      "raw": "## P0 — Now",
+      "section": "P0"
+    },
+    {
+      "line": 14,
+      "raw": "## P1 — This week",
+      "section": "P1"
+    }
+  ],
+  "items": [
+    {
+      "line": 8,
+      "section": "P0",
+      "priority": "P0",
+      "done": false,
+      "title": "First task",
+      "id": "t_0001",
+      "meta": {},
+      "body": []
+    },
+    {
+      "line": 11,
+      "section": "P0",
+      "priority": "P0",
+      "done": false,
+      "title": "Second task",
+      "id": "t_0002",
+      "meta": {},
+      "body": []
+    }
+  ]
+}

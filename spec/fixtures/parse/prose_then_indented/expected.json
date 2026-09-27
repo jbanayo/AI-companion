@@ -1,0 +1,31 @@
+{
+  "lineEnding": "lf",
+  "finalNewline": true,
+  "bom": false,
+  "headings": [
+    {
+      "line": 3,
+      "raw": "## P2 — Soon",
+      "section": "P2"
+    },
+    {
+      "line": 9,
+      "raw": "## P3 — Someday",
+      "section": "P3"
+    }
+  ],
+  "items": [
+    {
+      "line": 4,
+      "section": "P2",
+      "priority": "P2",
+      "done": false,
+      "title": "Task with a body line",
+      "id": "t_0003",
+      "meta": {},
+      "body": [
+        "a real body line"
+      ]
+    }
+  ]
+}

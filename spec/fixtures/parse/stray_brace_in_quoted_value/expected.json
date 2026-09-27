@@ -1,0 +1,28 @@
+{
+  "lineEnding": "lf",
+  "finalNewline": true,
+  "bom": false,
+  "headings": [
+    {
+      "line": 3,
+      "raw": "## P2 — Soon",
+      "section": "P2"
+    }
+  ],
+  "items": [
+    {
+      "line": 4,
+      "section": "P2",
+      "priority": "P2",
+      "done": false,
+      "title": "Fix config",
+      "id": "t_ab28",
+      "meta": {
+        "added": "2026-09-27",
+        "src": "claude-code",
+        "note": "the { is missing"
+      },
+      "body": []
+    }
+  ]
+}

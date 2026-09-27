@@ -108,63 +108,45 @@ class TodoParser:
         return (checkbox, content)
 
     def _parse_metadata(self, content: str) -> tuple:
-        """Extract metadata block from content. Return (title, metadata_dict)."""
-        # The block must be at the end, preceded by whitespace
+        """
+        Extract metadata block from content. Return (title, metadata_dict).
+
+        The block is the *shortest* trailing `{...}` preceded by whitespace
+        that parses fully as `key:value` pairs. Candidates are tried from
+        rightmost (shortest suffix) to leftmost, each validated by actually
+        running the pair grammar — not by counting brace depth, which breaks
+        as soon as a quoted value contains an unbalanced `{` or `}` (e.g.
+        `note:"the { is missing"`), since it can't tell a quoted literal
+        brace from a real nesting boundary.
+        """
         stripped = content.rstrip()
-
-        # Find last }
-        last_brace = stripped.rfind('}')
-        if last_brace == -1 or last_brace == len(stripped) - 1:
-            # No closing brace, or it's at the very end (which is required)
-            pass
-
-        if last_brace == -1:
+        if not stripped.endswith('}'):
             return (content.strip(), {})
 
-        # Check: if the content before } is "stripped", then last_brace is at its end
-        if last_brace < len(stripped) - 1:
-            # Something after }, so not a valid block suffix
-            return (content.strip(), {})
+        candidates = [
+            i for i in range(1, len(stripped))
+            if stripped[i] == '{' and stripped[i - 1] in (' ', '\t')
+        ]
 
-        # Find the opening {, but only the one that would make a valid block
-        # Valid block: { <pairs> } where each pair is key:value
-        brace_depth = 0
-        open_brace = -1
-        for i in range(last_brace, -1, -1):
-            if stripped[i] == '}':
-                brace_depth += 1
-            elif stripped[i] == '{':
-                brace_depth -= 1
-                if brace_depth == 0:
-                    open_brace = i
-                    break
-
-        if open_brace == -1 or open_brace == 0:
-            return (content.strip(), {})
-
-        # Check for space or tab before {
-        if stripped[open_brace - 1] not in (' ', '\t'):
-            return (content.strip(), {})
-
-        # Try to parse the block
-        block_str = stripped[open_brace + 1:last_brace]
-        title = stripped[:open_brace].rstrip()
-
-        if not title:
-            return (content.strip(), {})
-
-        # Parse pairs
-        meta = {}
-        try:
+        for open_brace in reversed(candidates):
+            block_str = stripped[open_brace + 1:len(stripped) - 1]
             meta = self._parse_block(block_str)
-        except:
-            # If parsing fails, treat whole thing as title
-            return (content.strip(), {})
+            if meta is None:
+                continue
+            title = stripped[:open_brace].rstrip()
+            if not title:
+                break  # degenerate: nothing left for a title, treat as no block
+            return (title, meta)
 
-        return (title, meta)
+        return (content.strip(), {})
 
-    def _parse_block(self, block_str: str) -> dict:
-        """Parse key:value pairs from block string."""
+    def _parse_block(self, block_str: str) -> Optional[dict]:
+        """
+        Parse key:value pairs from block string. Returns None if the string
+        doesn't fully match the `pair (ws+ pair)*` grammar (spec §2.5) — a
+        candidate that only partially parses is not a match; the caller
+        tries the next (longer) candidate suffix instead.
+        """
         meta = {}
         i = 0
         n = len(block_str)
@@ -178,8 +160,8 @@ class TodoParser:
 
             # Parse key: [a-z][a-z0-9_]*
             key_start = i
-            if i < n and block_str[i] not in 'abcdefghijklmnopqrstuvwxyz':
-                break
+            if block_str[i] not in 'abcdefghijklmnopqrstuvwxyz':
+                return None
             i += 1
             while i < n and block_str[i] in 'abcdefghijklmnopqrstuvwxyz0123456789_':
                 i += 1
@@ -189,7 +171,7 @@ class TodoParser:
             while i < n and block_str[i] in ' \t':
                 i += 1
             if i >= n or block_str[i] != ':':
-                break
+                return None
             i += 1
 
             # Skip whitespace after :
@@ -201,32 +183,30 @@ class TodoParser:
             if i < n and block_str[i] == '"':
                 # Quoted: "..." with \" and \\ escapes
                 i += 1
+                closed = False
                 while i < n:
-                    if block_str[i] == '\\' and i + 1 < n:
-                        next_ch = block_str[i + 1]
-                        if next_ch == '"':
-                            value += '"'
-                            i += 2
-                        elif next_ch == '\\':
-                            value += '\\'
-                            i += 2
-                        else:
-                            value += block_str[i]
-                            i += 1
+                    if block_str[i] == '\\' and i + 1 < n and block_str[i + 1] in ('"', '\\'):
+                        value += block_str[i + 1]
+                        i += 2
                     elif block_str[i] == '"':
                         i += 1
+                        closed = True
                         break
                     else:
                         value += block_str[i]
                         i += 1
+                if not closed:
+                    return None
             else:
                 # Bare: anything except whitespace, {, }, "
                 value_start = i
                 while i < n and block_str[i] not in ' \t{}\"':
                     i += 1
+                if i == value_start:
+                    return None  # empty bare value is not valid
                 value = block_str[value_start:i]
 
-            meta[key] = value
+            meta[key] = value  # last one wins on duplicate keys
 
         return meta
 

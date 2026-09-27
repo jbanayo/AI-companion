@@ -1,0 +1,41 @@
+{
+  "lineEnding": "lf",
+  "finalNewline": true,
+  "bom": false,
+  "headings": [
+    {
+      "line": 3,
+      "raw": "## P1 — This week",
+      "section": "P1"
+    },
+    {
+      "line": 6,
+      "raw": "## Done",
+      "section": "Done"
+    }
+  ],
+  "items": [
+    {
+      "line": 4,
+      "section": "P1",
+      "priority": "P1",
+      "done": true,
+      "title": "Finished early, still filed under P1",
+      "id": "t_0001",
+      "meta": {
+        "done": "2026-09-20"
+      },
+      "body": []
+    },
+    {
+      "line": 7,
+      "section": "Done",
+      "priority": "Done",
+      "done": false,
+      "title": "Reopened by hand but never moved back",
+      "id": "t_0002",
+      "meta": {},
+      "body": []
+    }
+  ]
+}

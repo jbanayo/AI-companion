@@ -61,28 +61,26 @@ A blank line ends an item's body.
 
 ### 2.3 Sections
 
-A heading is **known** if its text matches, case-insensitively:
+A heading (a line already identified as level-2 per §2.2) is **known** if the text right after `## ` starts with `P0`, `P1`, `P2`, `P3`, or `Done`, case-insensitively, at a word boundary — i.e. that word isn't immediately followed by another letter, digit, or underscore:
 
 ```
-^##\s+(P0|P1|P2|P3|Done)(\s*[—–-].*)?\s*$
+^(P0|P1|P2|P3|Done)\b
 ```
 
-So `## P1 — This week`, `## p1`, and `## P1 - later` are all P1. `## P12`, `## Done ✅`, and `## Ideas` are **unknown** headings.
+applied to the heading's text after its `## ` prefix. There's no requirement on what follows the boundary: it can be nothing, a dash and a comment, a colon, an emoji, anything.
+
+So `## P1 — This week`, `## p1`, `## P1 - later`, `## P1: stuff`, and `## Done ✅` are all known (`P1`, `P1`, `P1`, `P1`, `Done`). `## P12` is **unknown** — `P1` is immediately followed by `2`, another word character, so there's no boundary there. `## Ideas` is unknown too, for the obvious reason (doesn't start with any of the five words).
 
 - Every line belongs to the section of the nearest heading above it.
 - Lines before the first heading, and lines under an unknown heading, have section `null`.
 - If a known heading appears twice, both count as that section. New items go to the first one.
-- The text after the key (`— Now`) is display only and is never rewritten.
+- Everything from the word boundary onward (`— Now`, `: stuff`, ` ✅`, …) is display only and is never rewritten.
 
 ### 2.4 Priority and done status
 
 - **The checkbox decides done status.** `[x]` or `[X]` means done, `[ ]` means open. Where the item sits doesn't change this.
-- **The section decides priority:**
-
-| Where the item is | Open item | Done item |
-|---|---|---|
-| Under P0–P3 | That priority | That priority |
-| Under Done, an unknown heading, or before any heading | **P2** | `null` |
+- **The section decides priority for anything under a known heading** (P0–P3 or Done) — an item's priority is that heading's key, whether the item is open or done. An item under `## Done` shows priority `Done` even if it's still `[ ]` open; an item under `## P1` shows priority `P1` even if it's `[x]` done.
+- **Under an unknown heading, or before any heading,** priority is `P2`, regardless of done status. (There's no `null` priority — every item always displays in some group.)
 
 A done item sitting under P1, or an open item under Done, stays where it is. The parser doesn't move anything. It moves only when an operation touches it.
 
@@ -222,7 +220,7 @@ Place it directly **before the next known heading that comes after it** in the o
 These are implementation rules. The fixtures can't test them, so each implementation needs its own tests (stories E1.2, E1.3).
 
 - **Atomic writes:** write to a temp file in the same folder, then rename it over `TODO.md`.
-- **No lost updates:** every operation re-reads the file right before applying itself. It never writes back a copy held in memory from earlier.
+- **No lost updates:** every operation takes an exclusive lock (`TODO.md.lock`, created via an exclusive/`create-only` file open so two writers can't both get it) before it reads the file, and holds that lock until its write completes. A lock older than 5 seconds is assumed to be left by a crashed process and is cleared before retrying. **Re-reading before writing is not sufficient on its own** — two operations can each re-read a moment apart and still race to write; the lock is what actually serializes them. An implementation that skips the lock and only re-reads reopens the exact race story E1.3 exists to close.
 
 ---
 
@@ -238,6 +236,8 @@ spec/fixtures/
 ```
 
 **Every parse case is also a round-trip test:** `serialize(parse(input.md))` must equal `input.md` byte for byte.
+
+**`write/` is not built yet.** The shape above is the intended format (§4.2 describes it), but no fixtures exist under `write/` and neither `reference.py` nor the TypeScript tests run one — only `parse/` is exercised today. The two parsers' *writing* behavior is currently cross-checked only indirectly, through hand-written unit tests in each implementation (`mcp/src/__tests__/ops.test.ts` for TypeScript) that aren't guaranteed to cover the same cases on both sides. Building the `write/` fixtures and a runner for both languages is open work, not yet scheduled to a story.
 
 ### 4.1 `expected.json` shape
 
@@ -267,7 +267,7 @@ spec/fixtures/
 - `line` numbers are 1-based, in the original file.
 - `headings` lists level-2 headings only. `section` is `null` for unknown ones.
 - `meta` holds every metadata key **except** `id`. Order doesn't matter when comparing.
-- `body` holds the item's body lines exactly as written, without line endings.
+- `body` holds the item's body lines **trimmed** of leading/trailing whitespace, without line endings. This is a read-view convenience for API/tool callers — the underlying document keeps each body line's exact original bytes (indentation included), and a line an operation doesn't touch is written back unchanged. Only this JSON view (and the API's matching `ItemView.body`) trims; §3 ("Writing the file") is byte-exact.
 
 ### 4.2 `ops.json` shape
 
