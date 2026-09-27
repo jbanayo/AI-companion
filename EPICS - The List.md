@@ -91,19 +91,19 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E1.1 Parser + writer (TypeScript) · M · **Sonnet** · [D1–D3]
 *As the MCP server, I want to read and write `TODO.md` exactly per spec so that Claude's edits never damage the file.*
-- [ ] Passes every fixture in `spec/fixtures/`.
-- [ ] Hand-typed lines get an `id` the next time the file is written (D3).
-- [ ] Unknown content is kept as it was.
+- [x] Passes every fixture in `spec/fixtures/`.
+- [x] Hand-typed lines get an `id` the next time the file is written (D3).
+- [x] Unknown content is kept as it was.
 
 ### E1.2 Safe writes · S · **Sonnet** · [D4]
 *As the user, I want writes to never corrupt the file so that I never lose a task.*
-- [ ] Every write goes to a temp file and then renames it over `TODO.md`.
-- [ ] Killing the process mid-write leaves either the old file or the new one, never a half-written file.
+- [x] Every write goes to a temp file and then renames it over `TODO.md`.
+- [x] Killing the process mid-write leaves either the old file or the new one, never a half-written file.
 
 ### E1.3 No lost updates · S · **Opus** · [D4]
 *As the user, I want edits from the app, Claude, and my own editor to never overwrite each other.*
-- [ ] Every change re-reads the file right before writing and applies itself to that fresh copy. It never writes back an old copy held in memory.
-- [ ] Test: two writers add different items 10 ms apart → both items are in the file.
+- [x] Every change re-reads the file right before writing and applies itself to that fresh copy. It never writes back an old copy held in memory.
+- [x] Test: two writers add different items 10 ms apart → both items are in the file.
 
 > **Checkpoint:** nothing visible yet, but the most dangerous part (data integrity) is done and tested.
 

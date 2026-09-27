@@ -1,0 +1,25 @@
+{
+  "name": "the-list-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for The List — todo list that Claude fills in",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test dist/__tests__/*.test.js"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "todo"
+  ],
+  "author": "Julius",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.14.0"
+  }
+}
