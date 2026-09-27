@@ -113,9 +113,9 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E2.1 `add_todo` · M · **Sonnet** · [C1]
 *As me, I want to say "put X in my todo list" and have it written to the file.*
-- [ ] Tool `add_todo(title, priority?, due?, link?, project?, note?)` appends the item under the right heading.
-- [ ] Defaults: priority P2, `src:claude-code`, `added:<today>`.
-- [ ] Returns the new item, including its `id`, so Claude can confirm it.
+- [x] Tool `add_todo(title, priority?, due?, link?, project?, note?)` appends the item under the right heading.
+- [x] Defaults: priority P2, `src:claude-code`, `added:<today>`.
+- [x] Returns the new item, including its `id`, so Claude can confirm it.
 
 ### E2.2 Register with Claude Code · S · **Haiku** · [C2]
 *As me, I want the server available in every Claude Code session without extra setup.*
@@ -126,14 +126,14 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E2.3 `list_todos`, `complete_todo`, `update_todo` · M · **Sonnet** · [C1]
 *As me, I want to ask Claude what's on my list, tick things off, and change them without opening the file.*
-- [ ] `list_todos(filter?)` supports filtering by status, priority, and project, and sorts by effective priority (§6.3: overdue or due today counts as P0).
-- [ ] `complete_todo(id)` moves the item to Done with `done:<today>`.
-- [ ] `update_todo(id, …)` changes any field. A priority change moves the line to the new heading.
+- [x] `list_todos(filter?)` supports filtering by status, priority, and project, and sorts by effective priority (§6.3: overdue or due today counts as P0).
+- [x] `complete_todo(id)` moves the item to Done with `done:<today>`.
+- [x] `update_todo(id, …)` changes any field. A priority change moves the line to the new heading.
 
 ### E2.4 Duplicate check · S · **Sonnet** · [C7]
 *As me, I want Claude to notice when a task is already on the list so that I don't get duplicates.*
-- [ ] `add_todo` fuzzy-matches the title against open items. On a close match it doesn't add; it returns the existing item and `duplicate: true`.
-- [ ] Claude then asks "Update the existing one instead?"
+- [x] `add_todo` fuzzy-matches the title against open items. On a close match it doesn't add; it returns the existing item and `duplicate: true`.
+- [x] Claude then asks "Update the existing one instead?"
 
 ### E2.5 Register with Claude Desktop · S · **Haiku** · [C2]
 *As me, I want the same capture to work in the Claude Desktop app.*
