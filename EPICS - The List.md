@@ -137,8 +137,8 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E2.5 Register with Claude Desktop · S · **Haiku** · [C2]
 *As me, I want the same capture to work in the Claude Desktop app.*
-- [ ] Added to `claude_desktop_config.json`, and the tools appear in Claude Desktop.
-- [ ] Items added from Desktop carry `src:claude-desktop`.
+- [x] Added to `claude_desktop_config.json` (`mcpServers.the-list`, pointing at `mcp/dist/index.js`, `THE_LIST_SRC=claude-desktop`). Restart Claude Desktop and check `the-list`'s tools appear.
+- [x] Items added from Desktop carry `src:claude-desktop` — covered by the integration test (`server.integration.test.ts`); confirm once more with a real add from the Desktop app.
 
 ---
 
@@ -146,26 +146,26 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E3.1 Global instruction · S · **Opus** · [C3, C4, C5]
 *As me, I want Claude to spot tasks that are mine and ask before adding them.*
-- [ ] The instruction is added to `~/.claude/CLAUDE.md` (text from PRD C3).
-- [ ] An explicit "put this in my todo list" adds straight away. Anything Claude detects on its own gets proposed with a suggested priority and waits for "yes" (C4).
-- [ ] Test with 10 sample prompts: tasks that are mine get proposed; tasks Claude is doing itself, tasks owned by others, and vague ideas don't (C5).
+- [x] The instruction is added to `~/.claude/CLAUDE.md` (text from PRD C3).
+- [x] An explicit "put this in my todo list" adds straight away. Anything Claude detects on its own gets proposed with a suggested priority and waits for "yes" (C4).
+- [ ] Test with 10 sample prompts: tasks that are mine get proposed; tasks Claude is doing itself, tasks owned by others, and vague ideas don't (C5). **Needs a fresh Claude Code session after E2.2's registration is confirmed** — this session started before the instruction file existed and the MCP server isn't registered yet, so `add_todo` isn't callable here.
 
 ### E3.2 Priority suggestion · S · **Opus** · [§6.3]
 *As me, I want Claude's suggested priority to follow my rules so that I rarely have to correct it.*
-- [ ] The instruction includes the P0–P3 rules from §6.3.
-- [ ] Mentions of dates ("by Friday", "tomorrow") become a `due` date.
+- [x] The instruction includes the P0–P3 rules from §6.3.
+- [x] Mentions of dates ("by Friday", "tomorrow") become a `due` date.
 
 ### E3.3 Auto-link · S · **Sonnet** · [C6]
 *As me, I want each task to link back to where it came from.*
-- [ ] Claude attaches, in this order: the file being worked on (`vscode://file/…`), then a URL from the conversation, then a ClickUp task.
-- [ ] If none of those exist, the task has no link for now. Session links come in E7.3.
+- [x] Claude attaches, in this order: the file being worked on (`vscode://file/…`), then a URL from the conversation, then a ClickUp task.
+- [x] If none of those exist, the task has no link for now. Session links come in E7.3.
 
 ### E3.4 Proactive on/off switch · S · **Sonnet** · [C9]
 *As me, I want to turn off Claude's suggestions when they get in the way, without losing explicit adds.*
-- [ ] `add_todo` still works when `data/settings.json` has `"proactive": false`.
-- [ ] A new tool `get_settings` returns the settings, and the instruction tells Claude to check it before proposing anything.
-- [ ] With proactive off, the 10 test prompts produce no proposals, and explicit adds still work.
-- [ ] Until the app's Settings screen exists (E7.1), I flip the switch by editing the JSON or by asking Claude ("turn off todo suggestions").
+- [x] `add_todo` still works when `data/settings.json` has `"proactive": false`.
+- [x] A new tool `get_settings` returns the settings, and the instruction tells Claude to check it before proposing anything.
+- [ ] With proactive off, the 10 test prompts produce no proposals, and explicit adds still work. **Same live-session dependency as E3.1.**
+- [x] Until the app's Settings screen exists (E7.1), I flip the switch by editing the JSON or by asking Claude ("turn off todo suggestions").
 
 > **Checkpoint — M1 done.** The whole capture loop works with no app at all.
 

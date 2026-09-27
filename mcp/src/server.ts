@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 // confirmed by isolating a minimal repro. zod/v4 is also what the SDK's own examples use.
 import * as z from 'zod/v4';
 import { addTodoTool, completeTodoTool, listTodosTool, updateTodoTool } from './tools.js';
+import { readSettings } from './settings.js';
 
 const PRIORITY = z.enum(['P0', 'P1', 'P2', 'P3']);
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');
@@ -24,6 +25,8 @@ export interface ServerConfig {
   dataPath: string;
   /** How items added here are tagged (spec `src`): 'claude-code' or 'claude-desktop'. */
   src: string;
+  /** Path to `data/settings.json` (PRD C9). */
+  settingsPath: string;
 }
 
 export function createServer(config: ServerConfig): McpServer {
@@ -126,6 +129,25 @@ export function createServer(config: ServerConfig): McpServer {
       const result = await updateTodoTool(config.dataPath, id, fields);
       const text = result.updated ? `Updated "${result.item?.title}".` : `No item with id ${id}.`;
       return { content: [{ type: 'text' as const, text }], structuredContent: result };
+    }
+  );
+
+  server.registerTool(
+    'get_settings',
+    {
+      title: 'Get settings',
+      description:
+        "Reads Julius's The List settings. Check `proactive` before proposing a task he didn't " +
+        "explicitly ask for (PRD C9): when it's false, don't suggest — only add what he asks for directly.",
+      inputSchema: {},
+      outputSchema: { proactive: z.boolean() },
+    },
+    async () => {
+      const settings = await readSettings(config.settingsPath);
+      const text = settings.proactive
+        ? 'Proactive suggestions are on.'
+        : 'Proactive suggestions are off — only add tasks Julius explicitly asks for.';
+      return { content: [{ type: 'text' as const, text }], structuredContent: settings };
     }
   );
 

@@ -35,7 +35,7 @@ test('lists the four tools with descriptions', async () => {
   try {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
-    assert.deepEqual(names, ['add_todo', 'complete_todo', 'list_todos', 'update_todo']);
+    assert.deepEqual(names, ['add_todo', 'complete_todo', 'get_settings', 'list_todos', 'update_todo']);
     for (const t of tools) assert.ok(t.description && t.description.length > 10, `${t.name} needs a real description`);
   } finally {
     await client.close();
@@ -101,6 +101,21 @@ test('items added via a claude-desktop-configured server are tagged src:claude-d
     await client.callTool({ name: 'add_todo', arguments: { title: 'Desktop-originated task' } });
     const fileText = await readFile(join(dir, 'TODO.md'), 'utf-8');
     assert.match(fileText, /src:claude-desktop/);
+  } finally {
+    await client.close();
+  }
+});
+
+test('get_settings reflects data/settings.json, defaulting to proactive: true when absent', async () => {
+  const dir = await tempDataDir();
+  const client = await connectClient(dir);
+  try {
+    const missing = await client.callTool({ name: 'get_settings', arguments: {} });
+    assert.deepEqual(missing.structuredContent, { proactive: true });
+
+    await writeFile(join(dir, 'settings.json'), JSON.stringify({ proactive: false }));
+    const off = await client.callTool({ name: 'get_settings', arguments: {} });
+    assert.deepEqual(off.structuredContent, { proactive: false });
   } finally {
     await client.close();
   }
