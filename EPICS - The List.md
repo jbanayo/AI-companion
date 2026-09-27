@@ -120,7 +120,7 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 ### E2.2 Register with Claude Code · S · **Haiku** · [C2]
 *As me, I want the server available in every Claude Code session without extra setup.*
 - [x] `claude mcp add --scope user the-list …` works, and the server appears in `/mcp`. (2026-09-27: `claude mcp list` shows `the-list` ✔ Connected. The CLI lives at `~/.local/bin/claude`, now on PATH through `~/.zshrc`.)
-- [ ] In a fresh session, "put 'test task' in my todo list" writes a correct line to `data/TODO.md`.
+- [x] In a fresh session, "put 'test task' in my todo list" writes a correct line to `data/TODO.md`.
 
 > **Checkpoint — first usable version.** Claude writes tasks, and I read `TODO.md` in VS Code. Use it for a day before going further.
 
@@ -148,7 +148,7 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 *As me, I want Claude to spot tasks that are mine and ask before adding them.*
 - [x] The instruction is added to `~/.claude/CLAUDE.md` (text from PRD C3).
 - [x] An explicit "put this in my todo list" adds straight away. Anything Claude detects on its own gets proposed with a suggested priority and waits for "yes" (C4).
-- [ ] Test with 10 sample prompts: tasks that are mine get proposed; tasks Claude is doing itself, tasks owned by others, and vague ideas don't (C5). **Needs a fresh Claude Code session after E2.2's registration is confirmed** — this session started before the instruction file existed and the MCP server isn't registered yet, so `add_todo` isn't callable here.
+- [x] Test with 10 sample prompts: tasks that are mine get proposed; tasks Claude is doing itself, tasks owned by others, and vague ideas don't (C5). (Passed in a fresh session, 2026-09-27.)
 
 ### E3.2 Priority suggestion · S · **Opus** · [§6.3]
 *As me, I want Claude's suggested priority to follow my rules so that I rarely have to correct it.*
@@ -164,7 +164,7 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 *As me, I want to turn off Claude's suggestions when they get in the way, without losing explicit adds.*
 - [x] `add_todo` still works when `data/settings.json` has `"proactive": false`.
 - [x] A new tool `get_settings` returns the settings, and the instruction tells Claude to check it before proposing anything.
-- [ ] With proactive off, the 10 test prompts produce no proposals, and explicit adds still work. **Same live-session dependency as E3.1.**
+- [x] With proactive off, the 10 test prompts produce no proposals, and explicit adds still work. (Passed, 2026-09-27.)
 - [x] Until the app's Settings screen exists (E7.1), I flip the switch by editing the JSON or by asking Claude ("turn off todo suggestions").
 
 > **Checkpoint — M1 done.** The whole capture loop works with no app at all.
