@@ -119,7 +119,7 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E2.2 Register with Claude Code · S · **Haiku** · [C2]
 *As me, I want the server available in every Claude Code session without extra setup.*
-- [ ] `claude mcp add --scope user the-list …` works, and the server appears in `/mcp`.
+- [x] `claude mcp add --scope user the-list …` works, and the server appears in `/mcp`. (2026-09-27: `claude mcp list` shows `the-list` ✔ Connected. The CLI lives at `~/.local/bin/claude`, now on PATH through `~/.zshrc`.)
 - [ ] In a fresh session, "put 'test task' in my todo list" writes a correct line to `data/TODO.md`.
 
 > **Checkpoint — first usable version.** Claude writes tasks, and I read `TODO.md` in VS Code. Use it for a day before going further.
