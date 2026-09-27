@@ -41,7 +41,8 @@ export function createServer(config: ServerConfig): McpServer {
         "('put this in my todo list'), or — after he confirms — when you notice something in the " +
         'conversation that is his responsibility to act on. Before adding, check if a very similar ' +
         "open item already exists; if `duplicate` comes back true, ask whether to update the existing " +
-        'one instead of adding a new one.',
+        'one instead of adding a new one — or, if he confirms it really is a separate task, call this ' +
+        'again with `allowDuplicate: true`.',
       inputSchema: {
         title: z.string().min(1).describe('The task, written the way Julius would say it.'),
         priority: PRIORITY.optional().describe('P0 Now, P1 This week, P2 Soon (default), P3 Someday.'),
@@ -49,6 +50,10 @@ export function createServer(config: ServerConfig): McpServer {
         project: z.string().optional().describe('Project tag, e.g. solomon, lumen, prismo, personal.'),
         link: z.string().optional().describe('The file, URL, or ClickUp task this item relates to.'),
         note: z.string().optional().describe('Any extra context worth keeping.'),
+        allowDuplicate: z
+          .boolean()
+          .optional()
+          .describe('Set true to add anyway after Julius confirms a fuzzy-matched title is a separate task.'),
       },
       outputSchema: {
         added: z.boolean(),

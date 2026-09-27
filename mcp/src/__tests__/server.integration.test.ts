@@ -94,6 +94,30 @@ test('add_todo -> list_todos -> complete_todo -> update_todo end to end', async 
   }
 });
 
+test('add_todo with allowDuplicate: true adds a near-duplicate title instead of blocking it', async () => {
+  const dir = await tempDataDir();
+  const client = await connectClient(dir);
+  try {
+    await client.callTool({ name: 'add_todo', arguments: { title: 'Review Solomon extract PR #41' } });
+
+    const blocked = await client.callTool({ name: 'add_todo', arguments: { title: 'Review Solomon extract PR #42' } });
+    assert.equal((blocked.structuredContent as any).duplicate, true);
+
+    const forced = await client.callTool({
+      name: 'add_todo',
+      arguments: { title: 'Review Solomon extract PR #42', allowDuplicate: true },
+    });
+    const forcedContent = forced.structuredContent as any;
+    assert.equal(forcedContent.added, true);
+    assert.equal(forcedContent.duplicate, false);
+
+    const listed = await client.callTool({ name: 'list_todos', arguments: {} });
+    assert.equal((listed.structuredContent as any).count, 2);
+  } finally {
+    await client.close();
+  }
+});
+
 test('items added via a claude-desktop-configured server are tagged src:claude-desktop', async () => {
   const dir = await tempDataDir();
   const client = await connectClient(dir, 'claude-desktop');

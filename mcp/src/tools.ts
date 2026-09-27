@@ -39,6 +39,8 @@ export interface AddTodoArgs {
   project?: string;
   link?: string;
   note?: string;
+  /** Skip the fuzzy-duplicate check (PRD C7) — for a title that's legitimately close to an existing one. */
+  allowDuplicate?: boolean;
 }
 
 export interface AddTodoResult {
@@ -50,14 +52,17 @@ export interface AddTodoResult {
 
 /** E2.1 + E2.4: adds a task, unless an open item is already a close match (spec/PRD C7). */
 export async function addTodoTool(dataPath: string, args: AddTodoArgs, src: string): Promise<AddTodoResult> {
+  const { allowDuplicate, ...addInput } = args;
   return withTodoFile(dataPath, (doc) => {
     const t = today();
-    const dup = findSimilarOpenItem(doc, args.title);
-    if (dup) {
-      const view = deriveViews(doc).items.find((i) => i.id === dup.fields.id)!;
-      return { added: false, duplicate: true, item: summarize(view, t) };
+    if (!allowDuplicate) {
+      const dup = findSimilarOpenItem(doc, args.title);
+      if (dup) {
+        const view = deriveViews(doc).items.find((i) => i.id === dup.fields.id)!;
+        return { added: false, duplicate: true, item: summarize(view, t) };
+      }
     }
-    const created = addTodo(doc, { ...args, src, added: t });
+    const created = addTodo(doc, { ...addInput, src, added: t });
     const view = deriveViews(doc).items.find((i) => i.id === created.fields.id)!;
     return { added: true, duplicate: false, item: summarize(view, t) };
   });

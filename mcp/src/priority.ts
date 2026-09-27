@@ -42,6 +42,16 @@ export function sortByDisplayPriority(items: ItemView[], today: string): ItemVie
   });
 }
 
+/**
+ * Today's date in the server's local timezone (Julius's Mac), not UTC.
+ * `toISOString()` reports UTC, which lands on the wrong calendar day for
+ * several hours a day at UTC+8 — a task added at 11pm would get tomorrow's
+ * `added` date, and an item due today wouldn't show as P0 until 8am.
+ */
 export function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }

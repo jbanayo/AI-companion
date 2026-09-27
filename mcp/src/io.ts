@@ -68,18 +68,20 @@ export async function writeFileAtomic(path: string, bytes: Uint8Array): Promise<
   await rename(tmp, path);
 }
 
-async function readDocument(path: string): Promise<Document> {
-  let bytes: Uint8Array;
+/** Returns the file's raw bytes, or null if it doesn't exist yet (treated as an empty file). */
+async function readRaw(path: string): Promise<Uint8Array | null> {
   try {
-    bytes = await readFile(path);
+    return await readFile(path);
   } catch (err: any) {
-    if (err.code === 'ENOENT') {
-      bytes = new TextEncoder().encode(''); // treated as an empty file; skeleton applied on first write
-    } else {
-      throw err;
-    }
+    if (err.code === 'ENOENT') return null;
+    throw err;
   }
-  return parseDocument(bytes);
+}
+
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 /**
@@ -87,6 +89,11 @@ async function readDocument(path: string): Promise<Document> {
  * guarded by a lock so two callers (Claude Code and Claude Desktop, or a
  * hand edit mid-flight) can't lose each other's change (spec §3.5, E1.3).
  * `mutate` always sees a *fresh* read taken after the lock was acquired.
+ *
+ * Skips the write entirely when the serialized bytes come out identical to
+ * what was on disk (e.g. a `list_todos` that didn't need to assign any
+ * ids) — a query shouldn't touch the file's mtime or trigger the app's
+ * FSEvents watcher for a change that never happened.
  *
  * Empty-file skeleton substitution (spec §3.4) happens inside the
  * individual ops (e.g. addTodo), not here, so it also applies to callers
@@ -97,11 +104,14 @@ export async function withTodoFile<T>(path: string, mutate: (doc: Document) => T
   await mkdir(dirname(path), { recursive: true });
   await acquireLock(lockPath);
   try {
-    const doc = await readDocument(path);
+    const raw = await readRaw(path);
+    const doc = parseDocument(raw ?? new TextEncoder().encode(''));
     assignMissingIds(doc); // spec §3.2: every operation runs this first
     const result = mutate(doc);
     const bytes = serialize(doc);
-    await writeFileAtomic(path, bytes);
+    if (raw === null || !bytesEqual(raw, bytes)) {
+      await writeFileAtomic(path, bytes);
+    }
     return result;
   } finally {
     await releaseLock(lockPath);
@@ -110,5 +120,6 @@ export async function withTodoFile<T>(path: string, mutate: (doc: Document) => T
 
 /** Read-only view; no lock needed since nothing is written. */
 export async function readTodoFile(path: string): Promise<Document> {
-  return readDocument(path);
+  const raw = await readRaw(path);
+  return parseDocument(raw ?? new TextEncoder().encode(''));
 }

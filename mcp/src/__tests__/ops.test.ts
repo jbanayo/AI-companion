@@ -12,6 +12,7 @@ import {
   updateTodo,
 } from '../ops.js';
 import { makeSequenceIdGenerator } from '../id.js';
+import { today } from '../priority.js';
 
 function docFrom(text: string) {
   return parseDocument(new TextEncoder().encode(text));
@@ -29,7 +30,7 @@ test('addTodo into an existing section with items appends after the last one', (
   assert.equal(
     out,
     '# Todo\n\n## P1 — This week\n- [ ] First {id:t_0001}\n- [ ] Second {id:t_new1 added:' +
-      new Date().toISOString().slice(0, 10) +
+      today() +
       ' src:manual}\n\n## P2 — Soon\n'
   );
 });
@@ -138,4 +139,41 @@ test('findSimilarOpenItem returns null when nothing is close enough', () => {
   const doc = docFrom('# Todo\n\n## P1 — This week\n- [ ] Reply to Enzo on Prismo pricing {id:t_a}\n');
   const match = findSimilarOpenItem(doc, 'Buy groceries for the week');
   assert.equal(match, null);
+});
+
+test('addTodo strips newlines from title and free-text fields so the rendered line can never split', () => {
+  const doc = docFrom('# Todo\n\n## P2 — Soon\n');
+  const gen = makeSequenceIdGenerator(['t_nl']);
+  addTodo(doc, { title: 'Call Enzo\nabout pricing', note: 'line one\r\nline two', added: '2026-09-27' }, gen);
+  const out = textOf(doc);
+  assert.equal(out.split('\n').length, 5); // exactly one line for the item — no stray line breaks
+  assert.equal(
+    out,
+    '# Todo\n\n## P2 — Soon\n- [ ] Call Enzo about pricing {id:t_nl added:2026-09-27 src:manual note:"line one line two"}\n'
+  );
+});
+
+test('updateTodo strips newlines from a title/note it is given', () => {
+  const doc = docFrom('# Todo\n\n## P1 — This week\n- [ ] Task A {id:t_a}\n');
+  updateTodo(doc, 't_a', { title: 'Renamed\ntask', note: 'multi\nline' });
+  const out = textOf(doc);
+  assert.equal(out, '# Todo\n\n## P1 — This week\n- [ ] Renamed task {id:t_a note:"multi line"}\n');
+});
+
+test('assignMissingIds never assigns an id that collides with one already in the file', () => {
+  const doc = docFrom('# Todo\n\n## P1 — This week\n- [ ] Already has this id {id:t_dupe}\n- [ ] Hand-typed\n');
+  // The generator offers the colliding id first; assignMissingIds must skip it and take the next one.
+  assignMissingIds(doc, makeSequenceIdGenerator(['t_dupe', 't_fresh']));
+  const out = textOf(doc);
+  assert.equal(
+    out,
+    '# Todo\n\n## P1 — This week\n- [ ] Already has this id {id:t_dupe}\n- [ ] Hand-typed {id:t_fresh}\n'
+  );
+});
+
+test('addTodo never assigns a new id that collides with an existing item', () => {
+  const doc = docFrom('# Todo\n\n## P1 — This week\n- [ ] Existing {id:t_dupe}\n');
+  const gen = makeSequenceIdGenerator(['t_dupe', 't_fresh']);
+  const created = addTodo(doc, { title: 'New task', added: '2026-09-27' }, gen);
+  assert.equal(created.fields.id, 't_fresh');
 });

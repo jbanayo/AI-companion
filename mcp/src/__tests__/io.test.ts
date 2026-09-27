@@ -1,11 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { withTodoFile, writeFileAtomic } from '../io.js';
 import { addTodo } from '../ops.js';
 import { makeSequenceIdGenerator } from '../id.js';
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 async function tempFile(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'the-list-test-'));
@@ -81,4 +85,28 @@ test('withTodoFile leaves no lock file behind after it finishes', async () => {
   await withTodoFile(path, (doc) => addTodo(doc, { title: 'One task' }, makeSequenceIdGenerator(['t_x'])));
   const entries = await readdir(join(path, '..'));
   assert.ok(!entries.some((f) => f.endsWith('.lock')), 'lock file must be cleaned up');
+});
+
+test('withTodoFile skips the write when the mutation changes nothing (a pure query)', async () => {
+  const path = await tempFile();
+  await writeFile(path, '# Todo\n\n## P2 — Soon\n- [ ] Existing task {id:t_a}\n');
+  const before = await stat(path);
+  await sleep(20); // mtime has coarse resolution on some filesystems; make a real write unmissable
+
+  await withTodoFile(path, (doc) => doc.nodes.length); // reads and returns, mutates nothing
+
+  const after = await stat(path);
+  assert.equal(after.mtimeMs, before.mtimeMs, 'a no-op mutation must not rewrite the file');
+});
+
+test('withTodoFile still writes when the mutation actually changes something', async () => {
+  const path = await tempFile();
+  await writeFile(path, '# Todo\n\n## P2 — Soon\n');
+  const before = await stat(path);
+  await sleep(20);
+
+  await withTodoFile(path, (doc) => addTodo(doc, { title: 'New task' }, makeSequenceIdGenerator(['t_y'])));
+
+  const after = await stat(path);
+  assert.notEqual(after.mtimeMs, before.mtimeMs, 'a real change must still be written');
 });

@@ -36,38 +36,33 @@ function isItem(line: string): { checkbox: string; content: string } | null {
  * The block is the *shortest* trailing `{...}` preceded by whitespace that
  * parses fully as `key:value` pairs. Anything that doesn't parse as a full
  * block is left in the title untouched.
+ *
+ * Candidate open braces are tried from rightmost (shortest suffix) to
+ * leftmost, each validated by actually running the pair grammar rather than
+ * by counting brace depth — depth-counting breaks as soon as a quoted value
+ * contains an unbalanced `{` or `}` (e.g. `note:"the { is missing"`), since
+ * it can't tell a quoted literal brace from a real nesting boundary.
  */
 function parseMetadata(content: string): { title: string; meta: Map<string, string> } {
   const stripped = content.replace(/[ \t]+$/, '');
-  const lastBrace = stripped.lastIndexOf('}');
-  if (lastBrace === -1 || lastBrace !== stripped.length - 1) {
-    return { title: content.trim(), meta: new Map() };
+  if (!stripped.endsWith('}')) return { title: content.trim(), meta: new Map() };
+
+  const candidates: number[] = [];
+  for (let i = 1; i < stripped.length; i++) {
+    if (stripped[i] === '{' && (stripped[i - 1] === ' ' || stripped[i - 1] === '\t')) candidates.push(i);
   }
 
-  let depth = 0;
-  let openBrace = -1;
-  for (let i = lastBrace; i >= 0; i--) {
-    if (stripped[i] === '}') depth++;
-    else if (stripped[i] === '{') {
-      depth--;
-      if (depth === 0) {
-        openBrace = i;
-        break;
-      }
-    }
-  }
-  if (openBrace <= 0) return { title: content.trim(), meta: new Map() };
-  if (stripped[openBrace - 1] !== ' ' && stripped[openBrace - 1] !== '\t') {
-    return { title: content.trim(), meta: new Map() };
+  for (let k = candidates.length - 1; k >= 0; k--) {
+    const openBrace = candidates[k];
+    const blockStr = stripped.slice(openBrace + 1, stripped.length - 1);
+    const meta = parseBlock(blockStr);
+    if (meta === null) continue;
+    const title = stripped.slice(0, openBrace).replace(/[ \t]+$/, '');
+    if (!title) break; // degenerate: nothing left for a title, treat as no block
+    return { title, meta };
   }
 
-  const blockStr = stripped.slice(openBrace + 1, lastBrace);
-  const title = stripped.slice(0, openBrace).replace(/[ \t]+$/, '');
-  if (!title) return { title: content.trim(), meta: new Map() };
-
-  const meta = parseBlock(blockStr);
-  if (meta === null) return { title: content.trim(), meta: new Map() };
-  return { title, meta };
+  return { title: content.trim(), meta: new Map() };
 }
 
 /** Returns null if the block content doesn't fully parse as `pair (ws+ pair)*`. */
@@ -177,8 +172,11 @@ export function parseDocument(raw: Uint8Array): Document {
       continue;
     }
 
+    // Any line that isn't a body candidate for currentItem — blank or not —
+    // breaks the "directly after" chain (spec §2.2), so a later indented
+    // line must not attach to this item as a body line.
     nodes.push({ kind: 'other', raw: line } satisfies OtherNode);
-    if (line.trim() === '') currentItem = null;
+    currentItem = null;
   }
 
   return { lineEnding, finalNewline, bom, nodes };

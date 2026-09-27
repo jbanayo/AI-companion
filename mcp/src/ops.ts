@@ -11,6 +11,17 @@ import {
 } from './model.js';
 import { parseDocument } from './parse.js';
 import { generateId } from './id.js';
+import { today } from './priority.js';
+
+/**
+ * Strips newlines from a free-text field before it goes into the document.
+ * A raw `\n` in a title or metadata value would split the rendered line in
+ * two on write (render.ts only quotes a value, it doesn't escape newlines
+ * inside it), corrupting the item on the very next read.
+ */
+function sanitizeText(s: string): string {
+  return s.replace(/[\r\n]+/g, ' ').trim();
+}
 
 /** True when the document has no headings and no items — just blank/other lines, or nothing at all. */
 export function isEffectivelyEmpty(doc: Document): boolean {
@@ -110,11 +121,28 @@ function findItemIndex(doc: Document, id: string): number {
   return doc.nodes.findIndex((n) => n.kind === 'item' && n.fields.id === id);
 }
 
+function collectIds(doc: Document): Set<string> {
+  const used = new Set<string>();
+  for (const node of doc.nodes) {
+    if (node.kind === 'item' && node.fields.id !== null) used.add(node.fields.id);
+  }
+  return used;
+}
+
+/** Generates an id that doesn't collide with anything already in `used`, and reserves it. */
+function uniqueId(used: Set<string>, idGen: () => string): string {
+  let id = idGen();
+  while (used.has(id)) id = idGen();
+  used.add(id);
+  return id;
+}
+
 /** Every operation runs this first (spec §3.2). Idempotent. */
 export function assignMissingIds(doc: Document, idGen: () => string = generateId): void {
+  const used = collectIds(doc);
   for (const node of doc.nodes) {
     if (node.kind === 'item' && node.fields.id === null) {
-      node.fields.id = idGen();
+      node.fields.id = uniqueId(used, idGen);
       node.touched = true;
     }
   }
@@ -125,17 +153,17 @@ export function addTodo(doc: Document, input: AddInput, idGen: () => string = ge
   const priority: 'P0' | 'P1' | 'P2' | 'P3' = input.priority ?? 'P2';
   const meta = new Map<string, string>();
   if (input.due) meta.set('due', input.due);
-  meta.set('added', input.added ?? new Date().toISOString().slice(0, 10));
-  if (input.project) meta.set('project', input.project);
+  meta.set('added', input.added ?? today());
+  if (input.project) meta.set('project', sanitizeText(input.project));
   meta.set('src', input.src ?? 'manual');
-  if (input.link) meta.set('link', input.link);
-  if (input.note) meta.set('note', input.note);
+  if (input.link) meta.set('link', sanitizeText(input.link));
+  if (input.note) meta.set('note', sanitizeText(input.note));
 
   const item: ItemNode = {
     kind: 'item',
     raw: '',
     touched: true,
-    fields: { title: input.title, id: idGen(), meta, done: false },
+    fields: { title: sanitizeText(input.title), id: uniqueId(collectIds(doc), idGen), meta, done: false },
     body: [],
   };
 
@@ -174,11 +202,11 @@ export function updateTodo(doc: Document, id: string, fields: UpdateFields): Ite
   if (idx === -1) return null;
   const item = doc.nodes[idx] as ItemNode;
 
-  if (fields.title !== undefined) item.fields.title = fields.title;
+  if (fields.title !== undefined) item.fields.title = sanitizeText(fields.title);
   for (const key of ['due', 'project', 'link', 'note'] as const) {
     const v = fields[key];
     if (v === null) item.fields.meta.delete(key);
-    else if (v !== undefined) item.fields.meta.set(key, v);
+    else if (v !== undefined) item.fields.meta.set(key, sanitizeText(v));
   }
   item.touched = true;
 
