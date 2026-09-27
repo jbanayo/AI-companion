@@ -81,9 +81,9 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E0.3 Pick the stack · S · **Haiku**
 *As the builder, I want the tech choices written down so that I don't re-decide them mid-build.*
-- [ ] MCP server: TypeScript + the official MCP SDK, stdio transport (recommended; Python also works).
-- [ ] App: SwiftUI, macOS 26 target, `MenuBarExtra`.
-- [ ] Choices recorded in `README.md`.
+- [x] MCP server: TypeScript + the official MCP SDK, stdio transport (recommended; Python also works).
+- [x] App: SwiftUI, macOS 26 target, `MenuBarExtra`.
+- [x] Choices recorded in `README.md`.
 
 ---
 

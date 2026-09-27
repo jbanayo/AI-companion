@@ -24,4 +24,11 @@ Personal project (not a BYC product). Home of **The List**: a macOS menu bar tod
 
 ## Stack
 
-Recorded in E0.3.
+| Piece | Choice | Notes |
+|---|---|---|
+| `mcp/` | TypeScript on Node, official `@modelcontextprotocol/sdk`, stdio transport | Node 20.14 confirmed installed. `npm init`, one dependency (the SDK) plus a test runner. |
+| `app/` | Swift 6.2, SwiftUI, `MenuBarExtra`, macOS 26 target | Swift toolchain confirmed (6.2.3), but only the Command Line Tools are installed — **no Xcode.app**. Building a `MenuBarExtra` app needs full Xcode (App Store) for the app target and code signing; the CLI tools alone aren't enough. Install Xcode before starting E4. |
+| Tests | Node's built-in test runner (`node --test`) for `mcp/`; XCTest for `app/`; both run against `spec/fixtures/` (E0.2) | No extra test framework dependency needed on either side. |
+| Package manager | npm (`mcp/`), Swift Package Manager (`app/`) | No Xcode project file until E4.1; `app/` stays empty until then. |
+
+Nothing else pulled in — this stays a small, native, offline app per the PRD's non-goals.
