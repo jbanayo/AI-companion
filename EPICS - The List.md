@@ -175,8 +175,8 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E4.1 Menu bar shell · M · **Sonnet** · [A1]
 *As me, I want The List in my menu bar so that it's always one click away.*
-- [ ] A SwiftUI `MenuBarExtra` app with no Dock icon.
-- [ ] Clicking the icon opens an empty popover titled "The List".
+- [x] A SwiftUI `MenuBarExtra` app with no Dock icon. It's in `app/TheList/`, and `./build-app.sh` builds `build/The List.app`, signed for this Mac only. Confirmed as a `UIElement` process via `lsappinfo`. It's a Swift package, not an Xcode project: that keeps it buildable from the command line, and the optional widget (E7.5) is the only piece that would need a project.
+- [ ] Clicking the icon opens a popover titled "The List". **Needs a human look:** macOS blocks screenshots from Claude's process, so the icon's presence and the click haven't been seen, only checked in code and in `--render` output.
 
 ### E4.2 Swift parser · M · **Sonnet** · [D1–D3]
 *As the app, I want to read `TODO.md` exactly the way the MCP server does.*
@@ -185,17 +185,16 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E4.3 Show the list · M · **Sonnet** · [A3, §6.3]
 *As me, I want to see my tasks grouped by priority, with the urgent ones first.*
-- [ ] Groups for Now, This week, Soon, and Someday, with a count on each.
-- [ ] Each row shows the title, project tag, and a relative due date ("Today", "Tomorrow", "Wed", "Overdue 2d").
-- [ ] Anything overdue or due today appears under Now, without the file being rewritten.
-- *Logic built ahead of Xcode (2026-09-28):* `makeSnapshot` (the four groups with counts, the effective-priority bump, sort order) and `relativeDueLabel` in `TheListCore/ListLogic.swift`, tested in `fixture-check`. The view itself is still to do.
+- [x] Groups for Now, This week, Soon, and Someday, with a count on each.
+- [x] Each row shows the title, project tag, and a relative due date ("Today", "Tomorrow", "Wed", "Overdue 2d").
+- [x] Anything overdue or due today appears under Now, without the file being rewritten.
+- Logic: `makeSnapshot` and `relativeDueLabel` in `TheListCore`, tested in `fixture-check`. View: `app/TheList/Sources/TheList/PopoverView.swift`. Checked in light and dark mode with `TheList --render out.png --todo <file> --today <date>`, which draws the real view to a PNG. The renderer can't draw buttons, so the footer's Quit button appears as a placeholder in those images only.
 
 ### E4.4 Live sync + badge · M · **Sonnet** · [A2, A6, A9]
 *As me, I want the list to update by itself when Claude adds something.*
-- [ ] The app watches the file (FSEvents) and updates within 1 second of any outside change.
-- [ ] The badge shows the number of open P0 + P1 tasks and turns red when anything is overdue.
-- [ ] At idle: under 50 MB of memory and about 0% CPU.
-- *Logic built ahead of Xcode (2026-09-28):* `TodoFileWatcher` (FSEvents on the folder; it fires only when the bytes change) and `Badge`. Tested with an atomic rename, an in-place editor save, a real write from the TypeScript server and a delete: each is noticed in about 12 ms, and non-changes are ignored. The memory and CPU budget can only be measured once the app exists.
+- [x] The app watches the file (FSEvents) and updates within 1 second of any outside change. In the running app, a write from the TypeScript server reloaded it 12 ms later, and an in-place edit was also picked up. Both were confirmed from the app's log (`log show --info --predicate 'subsystem == "com.jbanayo.thelist"'`).
+- [x] The badge shows the number of open P0 + P1 tasks and turns red when anything is overdue. The count and red state were checked in the log and in `--render`'s icon output. The red is a non-template image because menu bar templates ignore color, so it still needs a human look in the real menu bar.
+- [x] At idle: under 50 MB of memory and about 0% CPU. Measured 14 MB footprint (29 MB RSS) and 0.0% CPU over 10 seconds idle.
 
 > **Checkpoint:** a Claude add now shows up in the menu bar within a second.
 
@@ -274,7 +273,7 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 ### E7.2 Archive · S · **Haiku** · [D5]
 *As me, I want old Done items cleared out so that the file stays short.*
 - [x] Done items older than 14 days (configurable) move to `data/archive/YYYY-MM.md`. This is `archiveOldDone` in `TheListCore`, specified in spec §3.6 and covered by 7 checks in `fixture-check`. It is safe to run repeatedly and survives a crash partway through.
-- [ ] Runs when the app starts and once a day. This is a single call from the app, so it lands with E4.1.
+- [x] Runs when the app starts and once a day, when the date changes. Checked by launching the app on a scratch list: the old item moved to `archive/2026-08.md` and the recent one stayed.
 
 ### E7.3 Session resume links · L · **Opus** · [L3, C6]
 *As me, I want a task to reopen the Claude Code session it came from.*
