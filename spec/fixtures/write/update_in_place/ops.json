@@ -1,0 +1,13 @@
+{
+  "idSequence": [],
+  "ops": [
+    {
+      "op": "update",
+      "id": "t_a",
+      "fields": {
+        "due": "2026-10-01",
+        "note": "check first"
+      }
+    }
+  ]
+}

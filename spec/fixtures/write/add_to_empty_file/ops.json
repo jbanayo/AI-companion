@@ -1,0 +1,15 @@
+{
+  "idSequence": [
+    "t_0100"
+  ],
+  "ops": [
+    {
+      "op": "add",
+      "item": {
+        "title": "My first task",
+        "added": "2026-09-27",
+        "src": "claude-code"
+      }
+    }
+  ]
+}

@@ -2,7 +2,8 @@
 """
 Reference parser for TODO.md format (spec/format.md).
 
-Validates all fixtures in spec/fixtures/parse/ and spec/fixtures/write/.
+Validates the fixtures in spec/fixtures/parse/. It has no write operations, so
+spec/fixtures/write/ is checked by the TypeScript and Swift runners instead.
 Usage:
   python3 spec/reference.py               # run all checks
   python3 spec/reference.py parse/normal  # run one case
@@ -65,13 +66,10 @@ class TodoParser:
         self._parse()
 
     def _detect_line_ending(self):
-        """Detect line ending from first line."""
-        if '\r\n' in self.text[:200]:
-            self.line_ending = 'crlf'
-            self.has_final_newline = self.text.endswith('\r\n') or self.text.endswith('\n')
-        else:
-            self.line_ending = 'lf'
-            self.has_final_newline = self.text.endswith('\n') if self.text else False
+        """Detect line ending from first line (spec §2.1)."""
+        first_newline = self.text.find('\n')
+        self.line_ending = 'crlf' if first_newline > 0 and self.text[first_newline - 1] == '\r' else 'lf'
+        self.has_final_newline = self.text.endswith('\n')
 
     def _split_lines(self) -> list:
         """Split text into lines, removing line endings."""

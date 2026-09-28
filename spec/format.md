@@ -54,7 +54,7 @@ Every line is exactly one of these, checked in this order:
 |---|---|
 | **Heading** | Starts with `## ` (two `#`, then whitespace). Only level-2 headings count; `#` and `###` lines are *other* lines. |
 | **Item** | Matches `^[-*+][ \t]+\[( \|x\|X)\][ \t]+(.+)$` (bullet, whitespace, checkbox, whitespace, content) and has a non-empty title (§2.5). No leading indentation. |
-| **Body** | Starts with 2+ spaces or a tab, isn't blank, and comes directly after an item or after another body line of that item. It belongs to that item. |
+| **Body** | Starts with a space or a tab, isn't blank, and comes directly after an item or after another body line of that item. It belongs to that item. |
 | **Other** | Anything else: blank lines, `# Todo`, paragraphs, indented lines that don't follow an item, items with an empty title. Kept as-is. |
 
 A blank line ends an item's body.
@@ -142,6 +142,7 @@ Note: a trailing `{word:value}` is always read as metadata. This is never a prob
 - An item with no `id` has id `null`.
 - **Duplicate ids:** if two items have the same id, the first one (top to bottom) keeps it. Every later one is read as id `null`, and its `id` key is left out of its metadata.
 - Items with id `null` get a new id the next time an operation runs (§3.2).
+- **A new id is never one already in the file.** If the generator produces an id some item already has (or one handed out earlier in the same operation), that id is thrown away and the next one is drawn.
 
 ---
 
@@ -237,7 +238,7 @@ spec/fixtures/
 
 **Every parse case is also a round-trip test:** `serialize(parse(input.md))` must equal `input.md` byte for byte.
 
-**`write/` is not built yet.** The shape above is the intended format (§4.2 describes it), but no fixtures exist under `write/` and neither `reference.py` nor the TypeScript tests run one — only `parse/` is exercised today. The two parsers' *writing* behavior is currently cross-checked only indirectly, through hand-written unit tests in each implementation (`mcp/src/__tests__/ops.test.ts` for TypeScript) that aren't guaranteed to cover the same cases on both sides. Building the `write/` fixtures and a runner for both languages is open work, not yet scheduled to a story.
+**Who runs what:** the TypeScript tests and the Swift checker run both `parse/` and `write/`. `reference.py` runs `parse/` only, because it has no write operations.
 
 ### 4.1 `expected.json` shape
 
@@ -283,10 +284,14 @@ spec/fixtures/
 }
 ```
 
-New ids are taken from `idSequence` in order: first by `assignMissingIds` (items top to bottom), then by `add`. Implementations must let tests supply ids this way instead of generating random ones.
+New ids are taken from `idSequence` in order: first by `assignMissingIds` (items top to bottom), then by `add`. An id that's already in use is consumed and skipped (§2.7), so it still uses up its place in the sequence. The runner calls `assignMissingIds` before every op (§3.2). An exhausted sequence is a fixture error, not a reason to generate a random id. Implementations must let tests supply ids this way instead of generating random ones.
+
+Every `add` in a fixture sets `added` explicitly, so the expected bytes don't depend on the day the test runs. `src` defaults to `manual` when left out. Supported ops: `add`, `complete`, `reopen`, `update`, `remove`, `assignMissingIds`.
 
 ### 4.3 Running the checks
 
 ```bash
-python3 spec/reference.py            # runs every fixture, prints PASS/FAIL
+python3 spec/reference.py                         # parse fixtures only
+(cd mcp && npm test)                              # TypeScript: parse + write fixtures, plus unit tests
+(cd app/TheListCore && swift run fixture-check)   # Swift: parse + write fixtures, plus file-safety checks
 ```

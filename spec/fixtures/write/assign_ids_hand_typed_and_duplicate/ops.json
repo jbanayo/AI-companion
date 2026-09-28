@@ -1,0 +1,12 @@
+{
+  "idSequence": [
+    "t_same",
+    "t_0100",
+    "t_0101"
+  ],
+  "ops": [
+    {
+      "op": "assignMissingIds"
+    }
+  ]
+}

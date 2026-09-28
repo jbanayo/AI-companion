@@ -118,12 +118,16 @@ function parseBlock(block: string): Map<string, string> | null {
 }
 
 export function parseDocument(raw: Uint8Array): Document {
-  let text = new TextDecoder('utf-8').decode(raw);
+  // ignoreBOM: true keeps the BOM in the decoded text; the default silently strips it,
+  // so it could never be detected here or written back (spec §2.1).
+  let text = new TextDecoder('utf-8', { ignoreBOM: true }).decode(raw);
   const bom = text.startsWith('﻿');
   if (bom) text = text.slice(1);
 
-  const lineEnding: LineEnding = text.includes('\r\n') ? 'crlf' : 'lf';
-  const finalNewline = lineEnding === 'crlf' ? /\r\n$/.test(text) : text.endsWith('\n') && !text.endsWith('\r\n') ? true : /\n$/.test(text);
+  // Spec §2.1: the first line's ending decides the whole file.
+  const firstNewline = text.indexOf('\n');
+  const lineEnding: LineEnding = firstNewline > 0 && text[firstNewline - 1] === '\r' ? 'crlf' : 'lf';
+  const finalNewline = text.endsWith('\n');
 
   let rawLines = text.length === 0 ? [] : text.split('\n').map((l) => l.replace(/\r$/, ''));
   if (rawLines.length > 0 && rawLines[rawLines.length - 1] === '') rawLines.pop();

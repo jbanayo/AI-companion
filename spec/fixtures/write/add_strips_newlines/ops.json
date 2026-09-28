@@ -1,0 +1,15 @@
+{
+  "idSequence": [
+    "t_0100"
+  ],
+  "ops": [
+    {
+      "op": "add",
+      "item": {
+        "title": "Call Enzo\nabout pricing",
+        "note": "line one\r\nline two",
+        "added": "2026-09-27"
+      }
+    }
+  ]
+}

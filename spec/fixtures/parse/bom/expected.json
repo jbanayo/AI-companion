@@ -1,0 +1,20 @@
+{
+  "lineEnding": "lf",
+  "finalNewline": true,
+  "bom": true,
+  "headings": [
+    { "line": 3, "raw": "## P2 — Soon", "section": "P2" }
+  ],
+  "items": [
+    {
+      "line": 4,
+      "section": "P2",
+      "priority": "P2",
+      "done": false,
+      "title": "Has a BOM",
+      "id": "t_0001",
+      "meta": {},
+      "body": []
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "idSequence": [
+    "t_0100"
+  ],
+  "ops": [
+    {
+      "op": "add",
+      "item": {
+        "title": "Second",
+        "priority": "P1",
+        "added": "2026-09-27",
+        "src": "claude-code"
+      }
+    }
+  ]
+}
