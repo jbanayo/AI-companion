@@ -14,3 +14,7 @@ build/
 DerivedData/
 *.xcuserstate
 xcuserdata/
+
+# Swift Package Manager (app/TheListCore/)
+.build/
+.swiftpm/

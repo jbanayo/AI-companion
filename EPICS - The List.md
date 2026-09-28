@@ -180,8 +180,8 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E4.2 Swift parser · M · **Sonnet** · [D1–D3]
 *As the app, I want to read `TODO.md` exactly the way the MCP server does.*
-- [ ] Passes every fixture in `spec/fixtures/` (the same set E1.1 uses).
-- [ ] Writes are safe (E1.2) and don't lose updates (E1.3).
+- [x] Passes every fixture in `spec/fixtures/` (the same set E1.1 uses). Built as `app/TheListCore/` and checked by `swift run fixture-check`: 13 parse and 17 write fixtures. Move these into XCTest once Xcode is installed.
+- [x] Writes are safe (E1.2) and don't lose updates (E1.3). It uses the same `TODO.md.lock` protocol as the MCP server. A test runs 30 writes each from Swift and the real TypeScript server at the same time, and none are lost.
 
 ### E4.3 Show the list · M · **Sonnet** · [A3, §6.3]
 *As me, I want to see my tasks grouped by priority, with the urgent ones first.*
