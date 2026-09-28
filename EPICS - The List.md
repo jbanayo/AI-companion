@@ -278,7 +278,13 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E7.3 Session resume links · L · **Opus** · [L3, C6]
 *As me, I want a task to reopen the Claude Code session it came from.*
-- [ ] **Spike first (S):** check whether the MCP server can learn the current Claude Code session id, for example from an environment variable or through a hook. If it can't, drop this story.
+- [x] **Spike first (S):** check whether the MCP server can learn the current Claude Code session id, for example from an environment variable or through a hook. If it can't, drop this story.
+  **Result (2026-09-28): it can, so the story stays.** Claude Code 2.1.283 starts each MCP server with `CLAUDE_CODE_SESSION_ID` in its environment. I checked the live `the-list` server behind a running session: its variable held that session's id, and the transcript `~/.claude/projects/<folder>/<id>.jsonl` carries the same id. No hook is needed.
+  - **Resume has to run in the session's folder.** Sessions are stored per project, so run `cd <cwd> && claude --resume <id>`. The folder name in `~/.claude/projects/` is a lossy encoding (spaces become `-`), so get `cwd` from the transcript's first entry instead. The app can find the transcript by id alone, which keeps the link short.
+  - **A running session may have no transcript yet.** One open VS Code panel had a server and an id but no file, because Claude Code writes the file on the first message. By the time `add_todo` runs there has been a message, but the app should still say "session no longer available" when the file is missing, for example after it's been deleted.
+  - **Claude Desktop chats get no session link.** Desktop isn't Claude Code and its chats can't be resumed with the CLI. When the variable is absent, the server adds no link.
+  - **Untested risk: `/clear`.** `/clear` starts a new session id. If the MCP server keeps running across `/clear`, its variable still holds the old id, and new tasks would link to the conversation before the clear. I can't test this without clearing a live session. Check it by hand before building: in a fresh session, add a task, run `/clear`, add another, and compare the ids against the transcript files. If it's stale, a `PreToolUse` hook on `mcp__the-list__add_todo` receives the live `session_id` and can pass it along.
+  - **Opening Terminal:** use a temporary `.command` script opened with `open`, not AppleScript. AppleScript would trigger a macOS Automation permission prompt.
 - [ ] If the spike succeeds: tasks carry `link:thelist://session/<id>`, the app registers the `thelist://` scheme, and clicking a task opens Terminal and runs `claude --resume <id>`.
 
 ### E7.4 Launch at login · S · **Haiku** · [A1]
