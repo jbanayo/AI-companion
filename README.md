@@ -39,7 +39,7 @@ cd app/TheList
 open "build/The List.app"       # starts it in the menu bar; Quit is in the popover footer
 ```
 
-The app reads `data/TODO.md` (the path is baked into the bundle at build time). To point it somewhere else, launch it with `open --env THE_LIST_TODO_PATH=/path/to/TODO.md "build/The List.app"`. To see the popover without clicking, `$(swift build --show-bin-path)/TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark]` draws it to a PNG. The app logs each reload under the subsystem `com.jbanayo.thelist`.
+The app reads `data/TODO.md` (the path is baked into the bundle at build time). To point it somewhere else, launch it with `open --env THE_LIST_TODO_PATH=/path/to/TODO.md "build/The List.app"`. To see the popover without clicking, `$(swift build --show-bin-path)/TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark]` draws it to a PNG (add `--show-done` to open the Done section). `$(swift build --show-bin-path)/TheList --selftest` runs the popover's actions (tick, untick, move, quick-add, an outside edit) through the real store against a scratch list. The app logs each reload under the subsystem `com.jbanayo.thelist`.
 
 ### Running the checks
 

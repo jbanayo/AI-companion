@@ -204,23 +204,25 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E5.1 Tick off · S · **Sonnet** · [A5]
 *As me, I want to mark a task done with one click.*
-- [ ] Clicking the checkbox moves the item to Done, with `done:<today>`.
-- [ ] A collapsible "Done (n)" section; clicking the checkbox again un-ticks an item.
+- [x] Clicking the checkbox moves the item to Done, with `done:<today>`.
+- [x] A collapsible "Done (n)" section; clicking the checkbox again un-ticks an item. Unticking returns the item to the heading it was ticked from in this session (or the one it sits under, else Soon), not always P2.
+- A task you typed by hand has no id yet, so the action finds it by line and title. If the file changed underneath, it refuses rather than guess. Covered by `fixture-check` and `TheList --selftest`, which drives the real store against a scratch list; a deliberately broken untick was caught.
 
 ### E5.2 Click through · M · **Sonnet** · [A4, L1, L2, L4]
 *As me, I want clicking a task to take me to its context.*
-- [ ] `https://` links open in the browser, `vscode://` links open VS Code at that file, and local paths open in Finder.
-- [ ] A task with no link opens `TODO.md` in VS Code at that line.
-- *Logic built ahead of Xcode (2026-09-28):* `clickTarget(for:todoPath:)` decides what each link opens, including the fallback to TODO.md at the task's line. Actually opening it (`NSWorkspace.open`) comes with the app.
+- [x] `https://` links open in the browser, `vscode://` links open VS Code at that file, and local paths open in Finder. Clicking a title opens `clickTarget(for:todoPath:)` with `NSWorkspace`. The targets are checked in `fixture-check`; actually opening them needs a human click.
+- [x] A task with no link opens `TODO.md` in VS Code at that line.
 
 ### E5.3 Change priority · S · **Haiku** · [A5]
 *As me, I want to move a task between priorities.*
-- [ ] A right-click menu offers P0–P3. The line moves to the new heading in the file.
-- [ ] Drag-and-drop between groups (optional; the right-click menu is enough for v1).
+- [x] A right-click menu offers P0–P3. The line moves to the new heading in the file. The menu marks and disables the item's current heading. The move is covered by the self-test; the menu itself needs a human click.
+- [ ] Drag-and-drop between groups (optional; the right-click menu is enough for v1). Not built.
 
 ### E5.4 Quick-add · S · **Haiku** · [A7]
 *As me, I want to add a task by hand without Claude.*
-- [ ] A text field at the top of the popover. Enter adds the task as P2 with `src:manual`.
+- [x] A text field at the top of the popover. Enter adds the task as P2 with `src:manual`. It has no duplicate check, since a hand-typed add is deliberate. Blank input does nothing, and newlines are stripped.
+
+**Still needs a human look:** typing in the field, right-click, and click-through in the real popover. macOS blocks screenshots from Claude's process, so these were tested through the store, not by clicking.
 
 > **Checkpoint — M2 done.** Daily driver: I no longer open the `.md` file directly.
 

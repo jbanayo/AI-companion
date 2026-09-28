@@ -570,5 +570,63 @@ check("the window is configurable") {
     return diff("moved ids", "[\"t_p1\", \"t_15\", \"t_14\", \"t_1\", \"t_hand\"]", "\(r.movedIds)")
 }
 
+// MARK: - Actions (E5)
+
+print("Actions:")
+
+func ref(_ path: String, title: String) throws -> ItemRef {
+    ItemRef(deriveViews(try readTodoFile(at: path)).items.first { $0.title == title }!)
+}
+
+check("tick moves the item to the top of Done; untick puts it back") {
+    let path = try tempTodoPath()
+    try write(path, "# Todo\n\n## P1 — This week\n- [ ] Task A {id:t_a}\n- [ ] Task B {id:t_b}\n\n## Done\n- [x] Old {id:t_o done:2026-09-01}\n")
+    guard try completeItem(todoPath: path, ref(path, title: "Task A"), today: monday) == .done else { return "complete refused" }
+    if let d = diff("after tick", "# Todo\n\n## P1 — This week\n- [ ] Task B {id:t_b}\n\n## Done\n- [x] Task A {id:t_a done:2026-09-28}\n- [x] Old {id:t_o done:2026-09-01}\n", try read(path)) { return d }
+    guard try reopenItem(todoPath: path, ref(path, title: "Task A"), priority: .p1) == .done else { return "reopen refused" }
+    return diff("after untick", "# Todo\n\n## P1 — This week\n- [ ] Task B {id:t_b}\n- [ ] Task A {id:t_a}\n\n## Done\n- [x] Old {id:t_o done:2026-09-01}\n", try read(path))
+}
+
+check("a hand-typed item (no id yet) is found by line and title") {
+    let path = try tempTodoPath()
+    try write(path, "# Todo\n\n## P2 — Soon\n- [ ] Typed by hand\n")
+    let r = try ref(path, title: "Typed by hand")
+    if r.id != nil { return "expected no id before the write" }
+    guard try completeItem(todoPath: path, r, today: monday) == .done else { return "complete refused" }
+    let item = deriveViews(try readTodoFile(at: path)).items.first!
+    return item.done && item.id != nil && item.meta["done"] == monday ? nil : "got \(item)"
+}
+
+check("a stale ref is refused and the item left alone") {
+    let path = try tempTodoPath()
+    try write(path, "# Todo\n\n## P2 — Soon\n- [ ] Typed by hand\n")
+    let stale = try ref(path, title: "Typed by hand")
+    try write(path, "# Todo\n\n## P2 — Soon\n- [ ] Someone added this first\n- [ ] Typed by hand\n") // line moved
+    if try completeItem(todoPath: path, stale, today: monday) != .listChanged { return "hand-typed: expected listChanged" }
+    if deriveViews(try readTodoFile(at: path)).items.contains(where: \.done) { return "hand-typed: something got ticked" }
+
+    try write(path, "# Todo\n\n## P2 — Soon\n- [ ] Gone soon {id:t_g}\n")
+    let gone = try ref(path, title: "Gone soon")
+    try write(path, "# Todo\n\n## P2 — Soon\n")
+    return try setPriority(todoPath: path, gone, .p0) == .listChanged ? nil : "removed item: expected listChanged"
+}
+
+check("change priority moves the item to the end of the new heading") {
+    let path = try tempTodoPath()
+    try write(path, "# Todo\n\n## P0 — Now\n- [ ] Urgent {id:t_u}\n\n## P2 — Soon\n- [ ] Task A {id:t_a}\n")
+    try setPriority(todoPath: path, ref(path, title: "Task A"), .p0)
+    return diff("file", "# Todo\n\n## P0 — Now\n- [ ] Urgent {id:t_u}\n- [ ] Task A {id:t_a}\n\n## P2 — Soon\n", try read(path))
+}
+
+check("quick-add adds at P2 with src:manual; a blank title does nothing") {
+    let path = try tempTodoPath()
+    try write(path, "# Todo\n\n## P2 — Soon\n")
+    guard let id = try quickAdd(todoPath: path, title: "  Buy\nmilk  ", today: monday) else { return "nothing added" }
+    if let d = diff("file", "# Todo\n\n## P2 — Soon\n- [ ] Buy milk {id:\(id) added:2026-09-28 src:manual}\n", try read(path)) { return d }
+    let before = try read(path)
+    if try quickAdd(todoPath: path, title: " \n ", today: monday) != nil { return "blank title was added" }
+    return diff("after blank", before, try read(path))
+}
+
 print("\n\(passed) passed, \(failed) failed")
 exit(failed == 0 ? 0 : 1)
