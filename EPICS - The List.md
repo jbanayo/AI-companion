@@ -222,7 +222,14 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 *As me, I want to add a task by hand without Claude.*
 - [x] A text field at the top of the popover. Enter adds the task as P2 with `src:manual`. It has no duplicate check, since a hand-typed add is deliberate. Blank input does nothing, and newlines are stripped.
 
-**Still needs a human look:** typing in the field, right-click, and click-through in the real popover. macOS blocks screenshots from Claude's process, so these were tested through the store, not by clicking.
+### E5.5 Task details · S · **Opus** · [A4, added 2026-09-29]
+*As me, I want clicking a task to show its full context first, then take me to its link, file, or Finder.*
+- [x] Clicking a title shows the task's details in the popover: note plus the indented lines under it, priority (with why it's under Now if it's only overdue), due date, added date and source, and done date. It has a Back button and a checkbox.
+- [x] Buttons fit where the link points: **Open link** (web), **Open in VS Code** and **Show in Finder** (`vscode://file/…`), **Open** and **Show in Finder** (a local path), **Open** (any other scheme), or **Open in TODO.md** (no link). A missing file is flagged in red and Show in Finder is disabled. **Edit in TODO.md** opens the task's line.
+- The link kinds and Finder paths are handled by `linkTarget(for:todoPath:)` in `TheListCore`, checked in `fixture-check`. All five kinds were rendered with `TheList --render … --detail "<title>"` in light and dark.
+- Right-click still offers a direct **Open**, plus **Show Details**.
+
+**Still needs a human look:** typing in the field, right-click, clicking a task, and the details view's buttons in the real popover. macOS blocks screenshots from Claude's process, so these were tested through the store, not by clicking.
 
 > **Checkpoint — M2 done.** Daily driver: I no longer open the `.md` file directly.
 

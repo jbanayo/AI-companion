@@ -365,6 +365,41 @@ check("click targets (PRD §6.5)") {
     return wrong.isEmpty ? nil : wrong.joined(separator: "\n")
 }
 
+check("link kinds, and the file behind each for Show in Finder") {
+    let todo = "/Users/me/AI Companion/data/TODO.md"
+    let cases: [(String, String, String?)] = [ // metadata block, kind, file path
+        ("{id:t_1 link:https://github.com/x/pull/42}", "web", nil),
+        ("{id:t_1 link:HTTP://example.com}", "web", nil),
+        ("{id:t_1 link:vscode://file/Users/me/a.md:12}", "vscodeFile", "/Users/me/a.md"),
+        ("{id:t_1 link:vscode://file/Users/me/My%20Docs/a.md:12:3}", "vscodeFile", "/Users/me/My Docs/a.md"),
+        ("{id:t_1 link:vscode://file/Users/me/plain.md}", "vscodeFile", "/Users/me/plain.md"),
+        ("{id:t_1 link:\"/Users/me/Desk top/f.pdf\"}", "file", "/Users/me/Desk top/f.pdf"),
+        ("{id:t_1 link:thelist://session/abc}", "other", nil),
+        ("{id:t_1 link:vscode://extension/foo}", "other", nil),
+        ("{id:t_1}", "todoLine", nil),
+    ]
+    let wrong = cases.compactMap { block, kind, path -> String? in
+        let item = deriveViews(doc("# Todo\n\n## P2 — Soon\n- [ ] Task \(block)\n")).items[0]
+        let t = linkTarget(for: item, todoPath: todo)
+        let gotKind = switch t {
+        case .web: "web"
+        case .vscodeFile: "vscodeFile"
+        case .file: "file"
+        case .other: "other"
+        case .todoLine: "todoLine"
+        }
+        return gotKind == kind && t.filePath == path ? nil : "\(block): want \(kind) \(path ?? "nil"), got \(gotKind) \(t.filePath ?? "nil")"
+    }
+    return wrong.isEmpty ? nil : wrong.joined(separator: "\n")
+}
+
+check("formatted days") {
+    let posix = Locale(identifier: "en_US_POSIX")
+    let got = [formattedDay("2026-09-26", today: monday, locale: posix), formattedDay("2027-01-03", today: monday, locale: posix),
+               formattedDay("soon", today: monday, locale: posix)]
+    return got == ["Sat, Sep 26", "Sun, Jan 3, 2027", "soon"] ? nil : "got \(got)"
+}
+
 // MARK: - File watcher (E4.4)
 
 final class Recorder: @unchecked Sendable {

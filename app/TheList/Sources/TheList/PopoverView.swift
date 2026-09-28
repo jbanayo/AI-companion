@@ -8,10 +8,14 @@ struct PopoverActions {
     var move: @MainActor (ItemView, Priority) -> Void = { _, _ in }
     var add: @MainActor (String, @escaping @MainActor (Bool) -> Void) -> Void = { _, done in done(false) }
     var quit: @MainActor () -> Void = {}
+    var openURL: @MainActor (URL) -> Void = { _ in }
+    var reveal: @MainActor (String) -> Void = { _ in }
+    var todoPath = ""
     var message: String?
 }
 
-/// The popover: quick-add (E5.4), the four priority groups (E4.3), and a collapsible Done section (E5.1).
+/// The popover: quick-add (E5.4), the four priority groups (E4.3), a collapsible Done section (E5.1),
+/// and a task's details when one is clicked.
 struct PopoverView: View {
     let snapshot: ListSnapshot
     let today: String
@@ -20,6 +24,8 @@ struct PopoverView: View {
     var scrollable = true
 
     @State var showDone = false
+    /// The task whose details are showing, by `key(_:)`; nil shows the list.
+    @State var selected: String?
     @State private var draft = ""
     @State private var adding = false
     @State private var contentHeight: CGFloat = 0
@@ -27,21 +33,41 @@ struct PopoverView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
-            quickAdd
-            Divider()
-            if scrollable {
-                ScrollView {
-                    list.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
-                }
-                .frame(height: min(max(contentHeight, 1), maxListHeight))
+            if let item = selectedItem {
+                fitting { DetailView(item: item, today: today, actions: actions) { selected = nil } }
             } else {
-                list
+                header
+                quickAdd
+                Divider()
+                fitting { list }
             }
             Divider()
             footer
         }
         .frame(width: 340)
+    }
+
+    static func key(_ item: ItemView) -> String { item.id ?? "title:\(item.title)" }
+
+    /// Looked up fresh each time, so the details follow the task through edits and moves.
+    private var selectedItem: ItemView? {
+        guard let selected else { return nil }
+        return (snapshot.groups.flatMap(\.items) + snapshot.done).first { Self.key($0) == selected }
+    }
+
+    private func select(_ item: ItemView) { selected = Self.key(item) }
+
+    /// Scrolls once the content is taller than `maxListHeight`; otherwise sizes to fit.
+    @ViewBuilder
+    private func fitting<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        if scrollable {
+            ScrollView {
+                content().onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+            }
+            .frame(height: min(max(contentHeight, 1), maxListHeight))
+        } else {
+            content()
+        }
     }
 
     private var header: some View {
@@ -83,7 +109,7 @@ struct PopoverView: View {
                     .padding(.vertical, 16)
             } else {
                 ForEach(snapshot.groups) { group in
-                    GroupSection(group: group, today: today, actions: actions)
+                    GroupSection(group: group, today: today, actions: actions, select: select)
                 }
                 if !snapshot.done.isEmpty { doneSection }
             }
@@ -110,7 +136,7 @@ struct PopoverView: View {
 
             if showDone {
                 ForEach(snapshot.done, id: \.line) { item in
-                    ItemRow(item: item, today: today, actions: actions)
+                    ItemRow(item: item, today: today, actions: actions, select: select)
                 }
             }
         }
@@ -140,6 +166,7 @@ private struct GroupSection: View {
     let group: ListGroup
     let today: String
     let actions: PopoverActions
+    let select: (ItemView) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -155,7 +182,7 @@ private struct GroupSection: View {
             .padding(.bottom, 2)
             .opacity(group.count == 0 ? 0.45 : 1)
             ForEach(group.items, id: \.line) { item in
-                ItemRow(item: item, today: today, actions: actions)
+                ItemRow(item: item, today: today, actions: actions, select: select)
             }
         }
     }
@@ -165,6 +192,7 @@ private struct ItemRow: View {
     let item: ItemView
     let today: String
     let actions: PopoverActions
+    let select: (ItemView) -> Void
     @State private var hovering = false
 
     var body: some View {
@@ -202,14 +230,16 @@ private struct ItemRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .onTapGesture { actions.open(item) }
-            .accessibilityAddTraits(.isLink)
+            .onTapGesture { select(item) }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Shows details")
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 3)
         .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? Color.secondary.opacity(0.12) : .clear))
         .onHover { hovering = $0 }
         .contextMenu {
+            Button("Show Details") { select(item) }
             Button("Open") { actions.open(item) }
             if !item.done {
                 Divider()

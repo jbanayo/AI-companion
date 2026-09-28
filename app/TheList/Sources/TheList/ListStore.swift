@@ -92,8 +92,16 @@ final class ListStore {
 
     /// E5.2: open the item's link, or TODO.md at its line.
     func open(_ item: ItemView) {
-        let url = clickTarget(for: item, todoPath: todoPath)
+        openURL(clickTarget(for: item, todoPath: todoPath))
+    }
+
+    func openURL(_ url: URL) {
         if !NSWorkspace.shared.open(url) { show("Couldn't open \(url.absoluteString)") }
+    }
+
+    /// Selects the file in a Finder window.
+    func reveal(_ path: String) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
 
     /// Runs a write off the main thread (the lock can wait up to 3 s), then refreshes right away

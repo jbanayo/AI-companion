@@ -138,7 +138,7 @@ The app re-sorts automatically when a due date passes: an overdue P1 is shown as
 | A1 | Native SwiftUI `MenuBarExtra` app, named **The List**. It has no Dock icon and starts at login (optional). |
 | A2 | The menu bar icon shows the count of open P0+P1 items. It turns red if any P0 is overdue. |
 | A3 | Clicking the icon opens a popover grouped by priority, showing title, project tag, and due date (relative, e.g. "in 2d" or "overdue"). |
-| A4 | Clicking an item opens its `link` with the system handler (URL, `vscode://`, ClickUp, Finder). Items without a link open `TODO.md` at that line. |
+| A4 | Clicking an item shows its details in the popover: title, note and body lines, priority, due date, and when it was added and by whom. The details have buttons that fit the link: Open link; Open in VS Code and Show in Finder; Open and Show in Finder for a local file; or Open in TODO.md when there's no link. Right-click keeps a direct Open. *(Changed 2026-09-29: it used to open the link straight away.)* |
 | A5 | A checkbox marks the item done. Changing priority uses a right-click menu or drag. |
 | A6 | The app watches the file (FSEvents) and updates within 1 second of any external write. |
 | A7 | A quick-add field at the top for manual entry. It defaults to P2. |

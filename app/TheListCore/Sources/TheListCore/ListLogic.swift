@@ -141,18 +141,76 @@ public func relativeDueLabel(_ due: String?, today: String, locale: Locale = .cu
     }
 }
 
-/// What clicking a task opens (PRD §6.5). `https://`, `vscode://`, `thelist://` and any other
-/// URL scheme open as-is; an absolute or `~/` path opens in Finder or its default app; no link
-/// (or one that can't be understood) opens TODO.md in VS Code at the item's line.
-public func clickTarget(for item: ItemView, todoPath: String) -> URL {
-    if let link = item.meta["link"].map(jsTrim), !link.isEmpty {
-        if link.hasPrefix("/") { return URL(fileURLWithPath: link) }
-        if link.hasPrefix("~/") { return URL(fileURLWithPath: (link as NSString).expandingTildeInPath) }
-        if link.range(of: "^[A-Za-z][A-Za-z0-9+.-]*:", options: .regularExpression) != nil,
-           let url = URL(string: link) ?? URL(string: link.replacingOccurrences(of: " ", with: "%20")) {
-            return url
+/// Where a task's link points (PRD §6.5), so the details view can offer the right buttons.
+public enum LinkTarget: Equatable, Sendable {
+    /// `http://` or `https://`: opens in the browser.
+    case web(URL)
+    /// `vscode://file/<path>[:line[:col]]`: opens VS Code; `path` is the file on disk.
+    case vscodeFile(URL, path: String)
+    /// An absolute or `~/` path: opens with its default app.
+    case file(URL)
+    /// Any other scheme (`thelist://`, `slack://`, …): handed to macOS as-is.
+    case other(URL)
+    /// No usable link: TODO.md in VS Code at the item's line.
+    case todoLine(URL)
+
+    /// What opening it means.
+    public var url: URL {
+        switch self {
+        case let .web(u), let .vscodeFile(u, _), let .file(u), let .other(u), let .todoLine(u): u
         }
     }
+
+    /// A file on disk that "Show in Finder" can reveal, if the link is to one.
+    public var filePath: String? {
+        switch self {
+        case let .vscodeFile(_, path): path
+        case let .file(u): u.path
+        case .web, .other, .todoLine: nil
+        }
+    }
+}
+
+public func linkTarget(for item: ItemView, todoPath: String) -> LinkTarget {
+    if let link = item.meta["link"].map(jsTrim), !link.isEmpty {
+        if link.hasPrefix("/") { return .file(URL(fileURLWithPath: link)) }
+        if link.hasPrefix("~/") { return .file(URL(fileURLWithPath: (link as NSString).expandingTildeInPath)) }
+        if link.range(of: "^[A-Za-z][A-Za-z0-9+.-]*:", options: .regularExpression) != nil,
+           let url = URL(string: link) ?? URL(string: link.replacingOccurrences(of: " ", with: "%20")) {
+            switch url.scheme?.lowercased() {
+            case "http", "https":
+                return .web(url)
+            case "vscode" where url.host == "file" && !url.path.isEmpty:
+                // url.path is percent-decoded; drop VS Code's trailing :line or :line:col.
+                let path = url.path.replacingOccurrences(of: #":\d+(:\d+)?$"#, with: "", options: .regularExpression)
+                return .vscodeFile(url, path: path)
+            default:
+                return .other(url)
+            }
+        }
+    }
+    return .todoLine(todoLineURL(for: item, todoPath: todoPath))
+}
+
+/// TODO.md in VS Code at the item's line, whatever its link.
+public func todoLineURL(for item: ItemView, todoPath: String) -> URL {
     let encoded = todoPath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? todoPath
     return URL(string: "vscode://file\(encoded):\(item.line)")!
+}
+
+/// What opening a task goes to: its link, or TODO.md in VS Code at its line.
+public func clickTarget(for item: ItemView, todoPath: String) -> URL {
+    linkTarget(for: item, todoPath: todoPath).url
+}
+
+/// "Sat, Sep 26", with the year added when it isn't `today`'s year. A date that isn't real comes back as typed.
+public func formattedDay(_ date: String, today: String, locale: Locale = .current) -> String {
+    guard let day = dayDate(date), let todayDay = dayDate(today) else { return date }
+    let f = DateFormatter()
+    f.calendar = utc
+    f.timeZone = utc.timeZone
+    f.locale = locale
+    let sameYear = utc.component(.year, from: day) == utc.component(.year, from: todayDay)
+    f.setLocalizedDateFormatFromTemplate(sameYear ? "EEEMMMd" : "EEEMMMdyyyy")
+    return f.string(from: day)
 }

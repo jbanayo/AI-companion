@@ -31,6 +31,9 @@ struct TheListApp: App {
                 move: store.move,
                 add: store.add,
                 quit: { NSApplication.shared.terminate(nil) },
+                openURL: store.openURL,
+                reveal: store.reveal,
+                todoPath: store.todoPath,
                 message: store.message
             ))
         } label: {
