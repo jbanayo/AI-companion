@@ -284,5 +284,173 @@ check("Swift and the TypeScript server writing at once lose nothing") {
     return switches >= 2 ? nil : "writers didn't interleave (\(switches) switches) — the test proved nothing, retune timings"
 }
 
+// MARK: - List logic (E4.3, E4.4 badge)
+
+func doc(_ text: String) -> Document { parseDocument(Array(text.utf8)) }
+let monday = "2026-09-28" // a Monday
+
+print("List logic:")
+
+check("groups, effective priority, sort order, badge") {
+    let d = doc("""
+    # Todo
+
+    ## P0 — Now
+    - [ ] Urgent thing {id:t_1}
+
+    ## P1 — This week
+    - [ ] Overdue review {id:t_2 due:2026-09-26}
+    - [ ] Due today {id:t_3 due:2026-09-28}
+    - [ ] Friday send {id:t_4 due:2026-10-02}
+    - [x] Done early {id:t_5 done:2026-09-27}
+
+    ## P2 — Soon
+    - [ ] Bad date {id:t_6 due:next-week}
+    - [ ] Alpha {id:t_7}
+
+    ## P3 — Someday
+
+    ## Done
+    - [ ] Unticked by hand {id:t_8}
+    - [x] Old {id:t_9 done:2026-09-20}
+
+    """)
+    let s = makeSnapshot(d, today: monday)
+    let got = s.groups.map { "\($0.title): \($0.items.compactMap(\.id))" }
+    let want = ["Now: [\"t_2\", \"t_3\", \"t_1\"]", "This week: [\"t_4\"]", "Soon: [\"t_7\", \"t_6\", \"t_8\"]", "Someday: []"]
+    if got != want { return "groups:\n  want \(want)\n  got  \(got)" }
+    if s.done.compactMap(\.id) != ["t_5", "t_9"] { return "done: \(s.done.compactMap(\.id))" }
+    return s.badge == Badge(count: 4, alert: true) ? nil : "badge: \(s.badge)"
+}
+
+check("due today counts toward the badge but isn't overdue; empty list is empty") {
+    let s = makeSnapshot(doc("# Todo\n\n## P2 — Soon\n- [ ] x {id:t_1 due:2026-09-28}\n"), today: monday)
+    if s.badge != Badge(count: 1, alert: false) { return "badge: \(s.badge)" }
+    let e = makeSnapshot(doc(""), today: monday)
+    return e.isEmpty && e.badge == Badge(count: 0, alert: false) && e.groups.count == 4 ? nil : "empty: \(e)"
+}
+
+check("relative due labels") {
+    let posix = Locale(identifier: "en_US_POSIX")
+    let cases: [(String?, String?)] = [
+        ("2026-09-28", "Today"), ("2026-09-29", "Tomorrow"), ("2026-09-30", "Wed"), ("2026-10-04", "Sun"),
+        ("2026-10-05", "Oct 5"), ("2026-09-27", "Overdue 1d"), ("2026-09-26", "Overdue 2d"),
+        ("2027-01-03", "Jan 3, 2027"), ("next-week", "next-week"), ("2026-02-30", "2026-02-30"), (nil, nil),
+    ]
+    let wrong = cases.compactMap { due, want -> String? in
+        let got = relativeDueLabel(due, today: monday, locale: posix)
+        return got == want ? nil : "\(due ?? "nil"): want \(want ?? "nil"), got \(got ?? "nil")"
+    }
+    return wrong.isEmpty ? nil : wrong.joined(separator: "\n")
+}
+
+check("click targets (PRD §6.5)") {
+    let todo = "/Users/me/AI Companion/data/TODO.md"
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let cases: [(String, String)] = [
+        ("{id:t_1 link:https://github.com/x/pull/42}", "https://github.com/x/pull/42"),
+        ("{id:t_1 link:vscode://file/Users/me/a.md:12}", "vscode://file/Users/me/a.md:12"),
+        ("{id:t_1 link:thelist://session/abc}", "thelist://session/abc"),
+        ("{id:t_1 link:/Users/me/Desktop/file.pdf}", "file:///Users/me/Desktop/file.pdf"),
+        ("{id:t_1 link:\"~/Documents/x.md\"}", URL(fileURLWithPath: home + "/Documents/x.md").absoluteString),
+        ("{id:t_1 link:\"vscode://file/Users/me/My Docs/a.md\"}", "vscode://file/Users/me/My%20Docs/a.md"),
+        ("{id:t_1}", "vscode://file/Users/me/AI%20Companion/data/TODO.md:4"),
+        ("{id:t_1 link:\"not a link\"}", "vscode://file/Users/me/AI%20Companion/data/TODO.md:4"),
+    ]
+    let wrong = cases.compactMap { block, want -> String? in
+        let item = deriveViews(doc("# Todo\n\n## P2 — Soon\n- [ ] Task \(block)\n")).items[0]
+        let got = clickTarget(for: item, todoPath: todo).absoluteString
+        return got == want ? nil : "\(block): want \(want), got \(got)"
+    }
+    return wrong.isEmpty ? nil : wrong.joined(separator: "\n")
+}
+
+// MARK: - File watcher (E4.4)
+
+final class Recorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var events: [[UInt8]?] = []
+    private let signal = DispatchSemaphore(value: 0)
+
+    func record(_ bytes: [UInt8]?) {
+        lock.lock(); events.append(bytes); lock.unlock()
+        signal.signal()
+    }
+
+    /// The next event and how long it took, or nil on timeout.
+    func next(within timeout: TimeInterval) -> (bytes: [UInt8]?, after: TimeInterval)? {
+        let start = Date()
+        guard signal.wait(timeout: .now() + timeout) == .success else { return nil }
+        lock.lock(); defer { lock.unlock() }
+        return (events.removeFirst(), Date().timeIntervalSince(start))
+    }
+}
+
+print("File watcher:")
+
+check("notices every kind of outside change within 1 s, and ignores non-changes") {
+    let path = try tempTodoPath()
+    try write(path, "# Todo\n\n## P2 — Soon\n")
+    let recorder = Recorder()
+    let watcher = TodoFileWatcher(path: path) { recorder.record($0) }
+    watcher.start()
+    defer { watcher.stop() }
+    usleep(200_000) // let the stream settle
+
+    var problems: [String] = []
+    func expectChange(_ what: String, _ act: () throws -> Void) throws {
+        let startedAt = Date()
+        try act()
+        let actedFor = Date().timeIntervalSince(startedAt)
+        guard let event = recorder.next(within: 1.0) else { problems.append("\(what): no event within 1 s"); return }
+        let onDisk = try? bytes(URL(fileURLWithPath: path))
+        if event.bytes != onDisk { problems.append("\(what): event bytes don't match the file") }
+        print("       \(what): noticed \(Int((event.after + actedFor) * 1000)) ms after the write started")
+        usleep(300_000)
+        while recorder.next(within: 0) != nil {} // drain duplicates from the same write
+    }
+
+    try expectChange("atomic rename (the MCP server's write)") {
+        _ = try withTodoFile(at: path) { addTodo($0, AddInput(title: "Renamed in", added: "2026-09-27")) }
+    }
+    try expectChange("in-place rewrite (an editor's save)") {
+        let fh = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
+        try fh.truncate(atOffset: 0)
+        try fh.write(contentsOf: Data("# Todo\n\n## P2 — Soon\n- [ ] Typed by hand\n".utf8))
+        try fh.close()
+    }
+    let ioJS = projectDir.appendingPathComponent("mcp/dist/io.js").path
+    if FileManager.default.fileExists(atPath: ioJS) {
+        try expectChange("the real TypeScript server") {
+            let node = Process()
+            node.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            node.arguments = ["node", "--input-type=module", "-e", """
+                const { withTodoFile } = await import(process.env.IO_JS);
+                const { addTodo } = await import(process.env.OPS_JS);
+                await withTodoFile(process.env.TODO_PATH, (doc) => addTodo(doc, { title: 'From node', added: '2026-09-27' }));
+                """]
+            var env = ProcessInfo.processInfo.environment
+            env["IO_JS"] = ioJS
+            env["OPS_JS"] = projectDir.appendingPathComponent("mcp/dist/ops.js").path
+            env["TODO_PATH"] = path
+            node.environment = env
+            try node.run()
+            node.waitUntilExit()
+        }
+    } else {
+        problems.append("mcp/dist is missing — run `npm run build` in mcp/")
+    }
+
+    // Non-changes: a no-op write (takes and drops the lock), and a stray file in the folder.
+    try withTodoFile(at: path) { _ in }
+    try write(URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent(".scratch.tmp").path, "x")
+    if let spurious = recorder.next(within: 0.6) {
+        problems.append("fired for a non-change (\(spurious.bytes?.count ?? -1) bytes)")
+    }
+
+    try expectChange("deleted") { try FileManager.default.removeItem(atPath: path) }
+    return problems.isEmpty ? nil : problems.joined(separator: "\n")
+}
+
 print("\n\(passed) passed, \(failed) failed")
 exit(failed == 0 ? 0 : 1)

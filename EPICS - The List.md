@@ -188,12 +188,14 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 - [ ] Groups for Now, This week, Soon, and Someday, with a count on each.
 - [ ] Each row shows the title, project tag, and a relative due date ("Today", "Tomorrow", "Wed", "Overdue 2d").
 - [ ] Anything overdue or due today appears under Now, without the file being rewritten.
+- *Logic built ahead of Xcode (2026-09-28):* `makeSnapshot` (the four groups with counts, the effective-priority bump, sort order) and `relativeDueLabel` in `TheListCore/ListLogic.swift`, tested in `fixture-check`. The view itself is still to do.
 
 ### E4.4 Live sync + badge · M · **Sonnet** · [A2, A6, A9]
 *As me, I want the list to update by itself when Claude adds something.*
 - [ ] The app watches the file (FSEvents) and updates within 1 second of any outside change.
 - [ ] The badge shows the number of open P0 + P1 tasks and turns red when anything is overdue.
 - [ ] At idle: under 50 MB of memory and about 0% CPU.
+- *Logic built ahead of Xcode (2026-09-28):* `TodoFileWatcher` (FSEvents on the folder; it fires only when the bytes change) and `Badge`. Tested with an atomic rename, an in-place editor save, a real write from the TypeScript server and a delete: each is noticed in about 12 ms, and non-changes are ignored. The memory and CPU budget can only be measured once the app exists.
 
 > **Checkpoint:** a Claude add now shows up in the menu bar within a second.
 
@@ -210,6 +212,7 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 *As me, I want clicking a task to take me to its context.*
 - [ ] `https://` links open in the browser, `vscode://` links open VS Code at that file, and local paths open in Finder.
 - [ ] A task with no link opens `TODO.md` in VS Code at that line.
+- *Logic built ahead of Xcode (2026-09-28):* `clickTarget(for:todoPath:)` decides what each link opens, including the fallback to TODO.md at the task's line. Actually opening it (`NSWorkspace.open`) comes with the app.
 
 ### E5.3 Change priority · S · **Haiku** · [A5]
 *As me, I want to move a task between priorities.*
