@@ -452,5 +452,123 @@ check("notices every kind of outside change within 1 s, and ignores non-changes"
     return problems.isEmpty ? nil : problems.joined(separator: "\n")
 }
 
+// MARK: - Archive (E7.2, spec §3.6)
+
+print("Archive:")
+
+let archiveTodo = """
+# Todo
+
+## P1 — This week
+- [ ] Still open, old due {id:t_open due:2026-08-01}
+- [x] Ticked under P1, old {id:t_p1 done:2026-08-20}
+
+## Done
+- [x] Done 15 days ago {id:t_15 done:2026-09-13}
+  with a body line
+- [x] Done 14 days ago {id:t_14 done:2026-09-14}
+- [x] Done yesterday {id:t_1 done:2026-09-27}
+- [x] Bad date {id:t_bad done:sometime}
+- [x] No done date {id:t_none}
+* [X] Hand   formatted {done:2026-07-31   id:t_hand}
+
+"""
+let archiveTodoAfter = """
+# Todo
+
+## P1 — This week
+- [ ] Still open, old due {id:t_open due:2026-08-01}
+
+## Done
+- [x] Done 14 days ago {id:t_14 done:2026-09-14}
+- [x] Done yesterday {id:t_1 done:2026-09-27}
+- [x] Bad date {id:t_bad done:sometime}
+- [x] No done date {id:t_none}
+
+"""
+let sept15 = "- [x] Done 15 days ago {id:t_15 done:2026-09-13}\n  with a body line\n"
+
+func archiveSetup(_ todo: String = archiveTodo) throws -> (todo: String, dir: String) {
+    let todo_ = try tempTodoPath()
+    try write(todo_, todo)
+    return (todo_, URL(fileURLWithPath: todo_).deletingLastPathComponent().appendingPathComponent("archive").path)
+}
+func archived(_ dir: String, _ month: String) throws -> String? {
+    let path = "\(dir)/\(month).md"
+    return FileManager.default.fileExists(atPath: path) ? try read(path) : nil
+}
+func diff(_ what: String, _ want: String?, _ got: String?) -> String? {
+    want == got ? nil : "\(what):\n  want \(String(reflecting: want))\n  got  \(String(reflecting: got))"
+}
+
+check("moves ticked items done more than 14 days ago, one file per month") {
+    let (todo, dir) = try archiveSetup()
+    let r = try archiveOldDone(todoPath: todo, archiveDir: dir, today: monday)
+    let problems = [
+        diff("moved ids", "[\"t_p1\", \"t_15\", \"t_hand\"]", "\(r.movedIds)"),
+        diff("files", "[\"2026-07.md\", \"2026-08.md\", \"2026-09.md\"]", "\(r.filesWritten.map { URL(fileURLWithPath: $0).lastPathComponent })"),
+        diff("TODO.md", archiveTodoAfter, try read(todo)),
+        diff("2026-07", "# Archive — 2026-07\n\n* [X] Hand   formatted {done:2026-07-31   id:t_hand}\n", try archived(dir, "2026-07")),
+        diff("2026-08", "# Archive — 2026-08\n\n- [x] Ticked under P1, old {id:t_p1 done:2026-08-20}\n", try archived(dir, "2026-08")),
+        diff("2026-09", "# Archive — 2026-09\n\n" + sept15, try archived(dir, "2026-09")),
+    ].compactMap { $0 }
+    return problems.isEmpty ? nil : problems.joined(separator: "\n")
+}
+
+check("running again moves nothing and touches no file") {
+    let (todo, dir) = try archiveSetup()
+    try archiveOldDone(todoPath: todo, archiveDir: dir, today: monday)
+    let before = try [todo, "\(dir)/2026-09.md"].map(mtime)
+    usleep(20_000)
+    let r = try archiveOldDone(todoPath: todo, archiveDir: dir, today: monday)
+    if !r.movedIds.isEmpty || !r.filesWritten.isEmpty { return "second run: \(r)" }
+    return try [todo, "\(dir)/2026-09.md"].map(mtime) == before ? nil : "a file was rewritten"
+}
+
+check("nothing old enough: no archive folder, TODO.md untouched") {
+    let (todo, dir) = try archiveSetup("# Todo\n\n## Done\n- [x] Recent {id:t_r done:2026-09-27}\n")
+    let before = try mtime(todo)
+    usleep(20_000)
+    try archiveOldDone(todoPath: todo, archiveDir: dir, today: monday)
+    if FileManager.default.fileExists(atPath: dir) { return "archive folder was created" }
+    return try mtime(todo) == before ? nil : "TODO.md was rewritten"
+}
+
+check("after a crash between the two writes, the item isn't archived twice") {
+    let (todo, dir) = try archiveSetup()
+    try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    let alreadyArchived = "# Archive — 2026-09\n\n" + sept15
+    try write("\(dir)/2026-09.md", alreadyArchived)
+    try archiveOldDone(todoPath: todo, archiveDir: dir, today: monday)
+    if let problem = diff("2026-09", alreadyArchived, try archived(dir, "2026-09")) { return problem }
+    return try read(todo).contains("t_15") ? "t_15 is still in TODO.md" : nil
+}
+
+check("appends to an existing archive, adding a missing final newline") {
+    let (todo, dir) = try archiveSetup()
+    try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    try write("\(dir)/2026-09.md", "# Archive — 2026-09\n\n- [x] Earlier {id:t_e done:2026-09-01}")
+    try archiveOldDone(todoPath: todo, archiveDir: dir, today: monday)
+    return diff("2026-09", "# Archive — 2026-09\n\n- [x] Earlier {id:t_e done:2026-09-01}\n" + sept15, try archived(dir, "2026-09"))
+}
+
+check("keeps a CRLF archive CRLF, with no stray blank line") {
+    let (todo, dir) = try archiveSetup()
+    try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    try write("\(dir)/2026-09.md", "# Archive — 2026-09\r\n\r\n- [x] Earlier {id:t_e done:2026-09-01}\r\n")
+    try archiveOldDone(todoPath: todo, archiveDir: dir, today: monday)
+    return diff(
+        "2026-09",
+        "# Archive — 2026-09\r\n\r\n- [x] Earlier {id:t_e done:2026-09-01}\r\n- [x] Done 15 days ago {id:t_15 done:2026-09-13}\r\n  with a body line\r\n",
+        try archived(dir, "2026-09")
+    )
+}
+
+check("the window is configurable") {
+    let (todo, dir) = try archiveSetup()
+    let r = try archiveOldDone(todoPath: todo, archiveDir: dir, afterDays: 0, today: monday)
+    return diff("moved ids", "[\"t_p1\", \"t_15\", \"t_14\", \"t_1\", \"t_hand\"]", "\(r.movedIds)")
+}
+
 print("\n\(passed) passed, \(failed) failed")
 exit(failed == 0 ? 0 : 1)

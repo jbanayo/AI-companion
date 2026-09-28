@@ -273,7 +273,8 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E7.2 Archive · S · **Haiku** · [D5]
 *As me, I want old Done items cleared out so that the file stays short.*
-- [ ] Done items older than 14 days (configurable) move to `data/archive/YYYY-MM.md` when the app starts and once a day.
+- [x] Done items older than 14 days (configurable) move to `data/archive/YYYY-MM.md`. This is `archiveOldDone` in `TheListCore`, specified in spec §3.6 and covered by 7 checks in `fixture-check`. It is safe to run repeatedly and survives a crash partway through.
+- [ ] Runs when the app starts and once a day. This is a single call from the app, so it lands with E4.1.
 
 ### E7.3 Session resume links · L · **Opus** · [L3, C6]
 *As me, I want a task to reopen the Claude Code session it came from.*

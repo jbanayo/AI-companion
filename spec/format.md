@@ -223,6 +223,17 @@ These are implementation rules. The fixtures can't test them, so each implementa
 - **Atomic writes:** write to a temp file in the same folder, then rename it over `TODO.md`.
 - **No lost updates:** every operation takes an exclusive lock (`TODO.md.lock`, created via an exclusive/`create-only` file open so two writers can't both get it) before it reads the file, and holds that lock until its write completes. A lock older than 5 seconds is assumed to be left by a crashed process and is cleared before retrying. **Re-reading before writing is not sufficient on its own** — two operations can each re-read a moment apart and still race to write; the lock is what actually serializes them. An implementation that skips the lock and only re-reads reopens the exact race story E1.3 exists to close.
 
+### 3.6 Archive (PRD D5)
+
+The app moves old finished items out of `TODO.md` when it starts and once a day. Implementation: `archiveOldDone` in `app/TheListCore/Sources/TheListCore/Archive.swift`.
+
+- **What moves:** every `[x]` item, under any heading, whose `done` date is more than N days before today (N = 14 by default, set in Settings). A done item from 14 days ago stays; one from 15 days ago moves.
+- **What stays:** open items, and done items without a real `done` date (§2.6). A box ticked by hand without a `done:` date has no age, so it is never archived.
+- **Where it goes:** `data/archive/YYYY-MM.md`, where `YYYY-MM` is the month of the item's `done` date, not today's month. A new archive file starts with `# Archive — YYYY-MM` and a blank line. Items are appended with their lines as they were, body included: an item nothing else touched keeps its exact bytes. The archive's own line ending is kept, and a missing final newline is added before appending.
+- **Removal:** the item's line and body lines leave `TODO.md`, and nothing else changes (§3.2).
+- **Order and recovery:** everything runs under the `TODO.md` lock (§3.5). Archive files are written first, then `TODO.md`. A crash in between leaves an item in both places, never in neither. An item whose id is already in its archive file isn't appended again, so the next run finishes the job without duplicating it. Running the archive any number of times gives the same result.
+- **No work, no writes:** if nothing is old enough, no file is created or rewritten.
+
 ---
 
 ## 4. Fixtures

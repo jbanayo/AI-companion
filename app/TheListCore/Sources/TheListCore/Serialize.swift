@@ -30,6 +30,11 @@ func renderItemLine(_ fields: ItemFields) -> String {
     return "- \(checkbox) \(fields.title)\(suffix)"
 }
 
+/// The item line (re-rendered only if touched) followed by its body lines, unchanged.
+func itemLines(_ item: ItemNode) -> [String] {
+    [item.touched ? renderItemLine(item.fields) : item.raw] + item.body
+}
+
 /// Rebuilds the file bytes. Untouched nodes come out byte-for-byte; only touched item lines are re-rendered.
 public func serialize(_ doc: Document) -> [UInt8] {
     let eol = doc.lineEnding == .crlf ? "\r\n" : "\n"
@@ -40,8 +45,7 @@ public func serialize(_ doc: Document) -> [UInt8] {
         case let .heading(raw, _), let .other(raw):
             lines.append(raw)
         case let .item(item):
-            lines.append(item.touched ? renderItemLine(item.fields) : item.raw)
-            lines.append(contentsOf: item.body)
+            lines.append(contentsOf: itemLines(item))
         }
     }
 

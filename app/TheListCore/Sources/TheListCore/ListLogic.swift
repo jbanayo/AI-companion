@@ -20,6 +20,12 @@ func dayDate(_ s: String) -> Date? {
     return back.year == y && back.month == m && back.day == d ? date : nil
 }
 
+/// Whole days from `a` to `b` (negative if `b` is earlier), or nil if either isn't a real date.
+func daysBetween(_ a: String, _ b: String) -> Int? {
+    guard let da = dayDate(a), let db = dayDate(b) else { return nil }
+    return utc.dateComponents([.day], from: da, to: db).day
+}
+
 /// A well-formed, real date. Malformed dates are ignored by sorting and overdue checks (spec §2.6).
 public func isValidDate(_ s: String) -> Bool { dayDate(s) != nil }
 
