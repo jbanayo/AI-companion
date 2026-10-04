@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Version | 1.0 |
+| Version | 1.1 (adds `group`, 2026-10-01) |
 | Date | 2026-09-26 |
 | Used by | `mcp/` (TypeScript), `app/` (Swift), `spec/reference.py` |
 | PRD | §6.1, D1–D4 |
@@ -130,6 +130,7 @@ Note: a trailing `{word:value}` is always read as metadata. This is never a prob
 | `done` | Date completed | `YYYY-MM-DD` |
 | `added` | Date added | `YYYY-MM-DD` |
 | `project` | Project tag | e.g. `solomon`, `lumen`, `personal` |
+| `group` | Task group | A group id from `data/settings.json`, e.g. `byc`, `personal`. Optional: see §2.8. |
 | `src` | Where it came from | `claude-code`, `claude-desktop`, `manual` |
 | `link` | What clicking opens | URL, `vscode://…`, `thelist://…`, or a path. Spaces must be `%20`-encoded or the value quoted. |
 | `note` | Free text | Usually quoted |
@@ -143,6 +144,23 @@ Note: a trailing `{word:value}` is always read as metadata. This is never a prob
 - **Duplicate ids:** if two items have the same id, the first one (top to bottom) keeps it. Every later one is read as id `null`, and its `id` key is left out of its metadata.
 - Items with id `null` get a new id the next time an operation runs (§3.2).
 - **A new id is never one already in the file.** If the generator produces an id some item already has (or one handed out earlier in the same operation), that id is thrown away and the next one is drawn.
+
+### 2.8 Groups
+
+Groups are defined in `data/settings.json`, not in `TODO.md`:
+
+```json
+{ "groups": [ { "id": "byc", "name": "BYC", "projects": ["solomon", "lumen", "prismo"] } ] }
+```
+
+A group without an `id` string, or with an id already used (case-insensitively), is ignored. `name` defaults to the id, and `projects` to `[]`. A missing or malformed `groups` value means there are no groups.
+
+> Display rule, not a parser rule, like effective priority in §2.4: a task's **effective group** is
+> 1. the group its `group` value names, if that group exists;
+> 2. otherwise the first group whose `projects` lists the task's `project`;
+> 3. otherwise none ("ungrouped").
+>
+> All comparisons ignore case. The file isn't rewritten for this, so a task tagged `project:prismo` shows under BYC without a `group` key. Implementations: `effectiveGroup` in `mcp/src/groups.ts` and `app/TheListCore/Sources/TheListCore/Settings.swift`.
 
 ---
 
@@ -180,7 +198,7 @@ A line an operation touches is rendered in this canonical form:
 
 - The bullet is `-`, and the checkbox is lowercase `x`.
 - The title is trimmed.
-- **Pair order:** `id`, `due`, `done`, `added`, `project`, `src`, `link`, `note`, then unknown keys in their original order.
+- **Pair order:** `id`, `due`, `done`, `added`, `project`, `group`, `src`, `link`, `note`, then unknown keys in their original order.
 - A value is written **quoted** if it's empty or contains whitespace, `{`, `}`, or `"`. Inside quotes, `"` becomes `\"` and `\` becomes `\\`. Every other value is written bare.
 - Body lines are never rewritten.
 

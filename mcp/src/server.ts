@@ -17,9 +17,12 @@ const ITEM_SHAPE = {
   done: z.boolean(),
   due: z.string().optional(),
   project: z.string().optional(),
+  group: z.string().optional(),
   link: z.string().optional(),
   note: z.string().optional(),
 };
+
+const GROUP_SHAPE = { id: z.string(), name: z.string(), projects: z.array(z.string()) };
 
 export interface ServerConfig {
   dataPath: string;
@@ -48,6 +51,12 @@ export function createServer(config: ServerConfig): McpServer {
         priority: PRIORITY.optional().describe('P0 Now, P1 This week, P2 Soon (default), P3 Someday.'),
         due: DATE.optional().describe('Due date, if one was mentioned.'),
         project: z.string().optional().describe('Project tag, e.g. solomon, lumen, prismo, personal.'),
+        group: z
+          .string()
+          .optional()
+          .describe(
+            "Group id from get_settings, e.g. byc or personal. Leave out when the project already belongs to a group."
+          ),
         link: z.string().optional().describe('The file, URL, or ClickUp task this item relates to.'),
         note: z.string().optional().describe('Any extra context worth keeping.'),
         allowDuplicate: z
@@ -62,7 +71,8 @@ export function createServer(config: ServerConfig): McpServer {
       },
     },
     async (args) => {
-      const result = await addTodoTool(config.dataPath, args, config.src);
+      const { groups } = await readSettings(config.settingsPath);
+      const result = await addTodoTool(config.dataPath, args, config.src, groups);
       const text = result.duplicate
         ? `Already on the list as "${result.item.title}" (${result.item.priority}${result.item.due ? `, due ${result.item.due}` : ''}, id ${result.item.id}). Update it instead of adding a new one?`
         : `Added "${result.item.title}" to ${result.item.priority}${result.item.due ? ` (due ${result.item.due})` : ''}. id ${result.item.id}.`;
@@ -81,6 +91,7 @@ export function createServer(config: ServerConfig): McpServer {
         status: z.enum(['open', 'done', 'all']).optional().describe('Defaults to open.'),
         priority: PRIORITY.optional().describe('Filter to items currently showing at this priority.'),
         project: z.string().optional().describe('Filter to one project tag.'),
+        group: z.string().optional().describe('Filter to one group id (see get_settings).'),
       },
       outputSchema: {
         items: z.array(z.object(ITEM_SHAPE)),
@@ -88,7 +99,8 @@ export function createServer(config: ServerConfig): McpServer {
       },
     },
     async (args) => {
-      const result = await listTodosTool(config.dataPath, args);
+      const { groups } = await readSettings(config.settingsPath);
+      const result = await listTodosTool(config.dataPath, args, groups);
       const text =
         result.count === 0
           ? 'Nothing matches.'
@@ -106,7 +118,8 @@ export function createServer(config: ServerConfig): McpServer {
       outputSchema: { completed: z.boolean(), item: z.object(ITEM_SHAPE).optional() },
     },
     async ({ id }) => {
-      const result = await completeTodoTool(config.dataPath, id);
+      const { groups } = await readSettings(config.settingsPath);
+      const result = await completeTodoTool(config.dataPath, id, groups);
       const text = result.completed ? `Marked "${result.item?.title}" done.` : `No open item with id ${id}.`;
       return { content: [{ type: 'text' as const, text }], structuredContent: result };
     }
@@ -117,7 +130,7 @@ export function createServer(config: ServerConfig): McpServer {
     {
       title: 'Update a todo',
       description:
-        'Changes fields on an existing task by id. Pass null for due/project/link/note to remove that ' +
+        'Changes fields on an existing task by id. Pass null for due/project/group/link/note to remove that ' +
         'field. Changing priority moves the item to the end of the new section.',
       inputSchema: {
         id: z.string().describe('The item id, e.g. t_8f2a.'),
@@ -125,13 +138,15 @@ export function createServer(config: ServerConfig): McpServer {
         priority: PRIORITY.optional(),
         due: DATE.nullable().optional(),
         project: z.string().nullable().optional(),
+        group: z.string().nullable().optional(),
         link: z.string().nullable().optional(),
         note: z.string().nullable().optional(),
       },
       outputSchema: { updated: z.boolean(), item: z.object(ITEM_SHAPE).optional() },
     },
     async ({ id, ...fields }) => {
-      const result = await updateTodoTool(config.dataPath, id, fields);
+      const { groups } = await readSettings(config.settingsPath);
+      const result = await updateTodoTool(config.dataPath, id, fields, groups);
       const text = result.updated ? `Updated "${result.item?.title}".` : `No item with id ${id}.`;
       return { content: [{ type: 'text' as const, text }], structuredContent: result };
     }
@@ -143,15 +158,22 @@ export function createServer(config: ServerConfig): McpServer {
       title: 'Get settings',
       description:
         "Reads Julius's The List settings. Check `proactive` before proposing a task he didn't " +
-        "explicitly ask for (PRD C9): when it's false, don't suggest — only add what he asks for directly.",
+        "explicitly ask for (PRD C9): when it's false, don't suggest — only add what he asks for directly. " +
+        '`groups` lists the task groups and the projects each one covers.',
       inputSchema: {},
-      outputSchema: { proactive: z.boolean() },
+      outputSchema: { proactive: z.boolean(), groups: z.array(z.object(GROUP_SHAPE)) },
     },
     async () => {
       const settings = await readSettings(config.settingsPath);
-      const text = settings.proactive
+      const proactive = settings.proactive
         ? 'Proactive suggestions are on.'
         : 'Proactive suggestions are off — only add tasks Julius explicitly asks for.';
+      const groups = settings.groups.length
+        ? settings.groups
+            .map((g) => `${g.id} (${g.name})${g.projects.length ? `: ${g.projects.join(', ')}` : ''}`)
+            .join('; ')
+        : 'none';
+      const text = `${proactive} Groups: ${groups}.`;
       return { content: [{ type: 'text' as const, text }], structuredContent: settings };
     }
   );

@@ -85,18 +85,77 @@ public struct Badge: Equatable, Sendable {
     }
 }
 
-public struct ListSnapshot: Equatable, Sendable {
-    /// Always the four groups, in order, even when empty.
-    public let groups: [ListGroup]
-    /// Ticked items, in file order (newest first, since completing puts an item at the top of Done).
-    public let done: [ItemView]
-    public let badge: Badge
-    public var isEmpty: Bool { groups.allSatisfy { $0.items.isEmpty } }
+/// Which tasks the popover shows (E8.2).
+public enum GroupFilter: Equatable, Hashable, Sendable {
+    case all
+    case group(String)
+    /// Tasks whose effective group is nil.
+    case ungrouped
+
+    /// For `@AppStorage`: "" is All, "\u{0}ungrouped" is Ungrouped, anything else a group id.
+    public init(storageKey: String) {
+        switch storageKey {
+        case "": self = .all
+        case GroupFilter.ungroupedKey: self = .ungrouped
+        default: self = .group(storageKey)
+        }
+    }
+
+    public var storageKey: String {
+        switch self {
+        case .all: ""
+        case .ungrouped: GroupFilter.ungroupedKey
+        case let .group(id): id
+        }
+    }
+
+    static let ungroupedKey = "\u{0}ungrouped"
 }
 
-public func makeSnapshot(_ doc: Document, today: String) -> ListSnapshot {
+public struct ListSnapshot: Equatable, Sendable {
+    /// Always the four groups, in order, even when empty. Only tasks matching `filter`.
+    public let groups: [ListGroup]
+    /// Ticked items matching `filter`, in file order (newest first, since completing puts an item at the top of Done).
+    public let done: [ItemView]
+    /// Every open task, whatever the filter: a P0 in another group still shows in the menu bar.
+    public let badge: Badge
+    /// The groups defined in settings.json, in order.
+    public let taskGroups: [TaskGroup]
+    /// What's showing. A filter naming a group that no longer exists comes back as `.all`.
+    public let filter: GroupFilter
+    /// Open tasks per filter, for the picker. Every filter has an entry, including `.all`.
+    public let openCounts: [GroupFilter: Int]
+    public var isEmpty: Bool { groups.allSatisfy { $0.items.isEmpty } }
+
+    public var openCount: Int { groups.reduce(0) { $0 + $1.count } }
+
+    public func group(of item: ItemView) -> TaskGroup? { effectiveGroup(item, groups: taskGroups) }
+
+    /// The picker's label for the current filter.
+    public var filterName: String {
+        switch filter {
+        case .all: "All"
+        case .ungrouped: "Ungrouped"
+        case let .group(id): taskGroups.first { $0.id == id }?.name ?? "All"
+        }
+    }
+}
+
+public func makeSnapshot(_ doc: Document, today: String, groups taskGroups: [TaskGroup] = [],
+                         filter: GroupFilter = .all) -> ListSnapshot {
     let items = deriveViews(doc).items
     let open = items.filter { !$0.done }
+
+    var filter = filter
+    if case let .group(id) = filter, !taskGroups.contains(where: { $0.id == id }) { filter = .all }
+    func key(_ item: ItemView) -> GroupFilter {
+        effectiveGroup(item, groups: taskGroups).map { .group($0.id) } ?? .ungrouped
+    }
+    func matches(_ item: ItemView) -> Bool { filter == .all || key(item) == filter }
+
+    var openCounts: [GroupFilter: Int] = [.all: open.count, .ungrouped: 0]
+    for g in taskGroups { openCounts[.group(g.id)] = 0 }
+    for item in open { openCounts[key(item), default: 0] += 1 }
 
     func group(of item: ItemView) -> Priority {
         switch displayPriority(item, today: today) {
@@ -109,13 +168,17 @@ public func makeSnapshot(_ doc: Document, today: String) -> ListSnapshot {
         }
     }
 
-    let sorted = sortByDisplayPriority(open, today: today)
+    let allSorted = sortByDisplayPriority(open, today: today)
+    let urgent = allSorted.filter { [.p0, .p1].contains(group(of: $0)) }.count
+    let sorted = allSorted.filter(matches)
     let groups = Priority.allCases.map { p in ListGroup(priority: p, items: sorted.filter { group(of: $0) == p }) }
-    let urgent = groups[0].count + groups[1].count
     return ListSnapshot(
         groups: groups,
-        done: items.filter(\.done),
-        badge: Badge(count: urgent, alert: open.contains { isOverdue($0, today: today) })
+        done: items.filter { $0.done && matches($0) },
+        badge: Badge(count: urgent, alert: open.contains { isOverdue($0, today: today) }),
+        taskGroups: taskGroups,
+        filter: filter,
+        openCounts: openCounts
     )
 }
 

@@ -20,6 +20,8 @@ Personal project (not a BYC product). Home of **The List**: a macOS menu bar tod
 
 - `data/TODO.md` is the single source of truth. It's plain Markdown and safe to edit by hand.
 - `data/settings.json` holds `proactive` (`true`/`false`). When `false`, Claude stops suggesting tasks but still adds the ones I ask for.
+- `data/settings.json` also holds `groups`, the menu in the popover header. Each group has an `id`, a `name`, and the `projects` it covers. A task shows under the group its `group:` key names, else under the group that lists its `project:` (spec §2.8). The app's New Group… adds one here, and edits by hand show up live.
+- `data/reminders-map.json` remembers which Apple Reminder each task was exported to, so Export to Reminders updates them instead of duplicating them. Delete it to start over. The next export then creates fresh reminders, so delete the old "The List · …" lists in Reminders first.
 - `data/archive/` gets Done items older than 14 days, one file per month.
 
 ## Stack
@@ -39,7 +41,9 @@ cd app/TheList
 open "build/The List.app"       # starts it in the menu bar; Quit is in the popover footer
 ```
 
-The app reads `data/TODO.md` (the path is baked into the bundle at build time). To point it somewhere else, launch it with `open --env THE_LIST_TODO_PATH=/path/to/TODO.md "build/The List.app"`. To see the popover without clicking, `$(swift build --show-bin-path)/TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark]` draws it to a PNG (add `--show-done` to open the Done section). `$(swift build --show-bin-path)/TheList --selftest` runs the popover's actions (tick, untick, move, quick-add, an outside edit) through the real store against a scratch list. The app logs each reload under the subsystem `com.jbanayo.thelist`.
+The app reads `data/TODO.md` (the path is baked into the bundle at build time). To point it somewhere else, launch it with `open --env THE_LIST_TODO_PATH=/path/to/TODO.md "build/The List.app"`. To see the popover without clicking, `$(swift build --show-bin-path)/TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark]` draws it to a PNG (add `--show-done` to open the Done section, `--group <id>` to show one group). `$(swift build --show-bin-path)/TheList --selftest` runs the popover's actions (tick, untick, move, quick-add, an outside edit) through the real store against a scratch list. The app logs each reload under the subsystem `com.jbanayo.thelist`.
+
+**Export to Reminders** asks for Reminders access the first time. It only works from the bundled app, because macOS needs the usage text in `Info.plist`. The app is signed ad hoc, so macOS may ask again after a rebuild. If it says access is denied, turn The List back on in System Settings → Privacy & Security → Reminders.
 
 ### Running the checks
 

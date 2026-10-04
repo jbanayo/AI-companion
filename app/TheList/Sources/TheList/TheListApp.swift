@@ -30,11 +30,17 @@ struct TheListApp: App {
                 open: store.open,
                 move: store.move,
                 add: store.add,
+                selectFilter: { store.filter = $0 },
+                setGroup: store.setGroup,
+                addGroup: store.addGroup,
+                exportReminders: store.exportReminders,
+                exporting: store.exporting,
                 quit: { NSApplication.shared.terminate(nil) },
                 openURL: store.openURL,
                 reveal: store.reveal,
                 todoPath: store.todoPath,
-                message: store.message
+                message: store.message,
+                messageIsError: store.messageIsError
             ))
         } label: {
             Image(nsImage: MenuBarIcon.image(for: store.snapshot.badge))

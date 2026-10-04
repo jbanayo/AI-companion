@@ -135,11 +135,73 @@ test('get_settings reflects data/settings.json, defaulting to proactive: true wh
   const client = await connectClient(dir);
   try {
     const missing = await client.callTool({ name: 'get_settings', arguments: {} });
-    assert.deepEqual(missing.structuredContent, { proactive: true });
+    assert.deepEqual(missing.structuredContent, { proactive: true, groups: [] });
 
     await writeFile(join(dir, 'settings.json'), JSON.stringify({ proactive: false }));
     const off = await client.callTool({ name: 'get_settings', arguments: {} });
-    assert.deepEqual(off.structuredContent, { proactive: false });
+    assert.deepEqual(off.structuredContent, { proactive: false, groups: [] });
+  } finally {
+    await client.close();
+  }
+});
+
+test('groups: get_settings lists them, add/update set them, list_todos filters on the effective group', async () => {
+  const dir = await tempDataDir();
+  await writeFile(
+    join(dir, 'settings.json'),
+    JSON.stringify({
+      proactive: true,
+      groups: [
+        { id: 'byc', name: 'BYC', projects: ['solomon', 'prismo'] },
+        { id: 'personal', name: 'Personal projects', projects: ['personal'] },
+      ],
+    })
+  );
+  const client = await connectClient(dir);
+  try {
+    const settings = (await client.callTool({ name: 'get_settings', arguments: {} })).structuredContent as any;
+    assert.deepEqual(
+      settings.groups.map((g: any) => g.id),
+      ['byc', 'personal']
+    );
+
+    // Project mapping: no group key written, but it reports as byc.
+    const viaProject = (
+      await client.callTool({ name: 'add_todo', arguments: { title: 'Review Solomon PR', project: 'Solomon' } })
+    ).structuredContent as any;
+    assert.equal(viaProject.item.group, 'byc');
+
+    // Explicit group key.
+    const explicit = (
+      await client.callTool({ name: 'add_todo', arguments: { title: 'Book the dentist', group: 'personal' } })
+    ).structuredContent as any;
+    assert.equal(explicit.item.group, 'personal');
+
+    const ungrouped = (await client.callTool({ name: 'add_todo', arguments: { title: 'Something else' } }))
+      .structuredContent as any;
+    assert.equal(ungrouped.item.group, undefined);
+
+    const fileText = await readFile(join(dir, 'TODO.md'), 'utf-8');
+    assert.match(fileText, /Book the dentist \{id:t_[0-9a-f]{4} added:\S+ group:personal src:claude-code\}/);
+    assert.doesNotMatch(fileText, /Review Solomon PR .*group:/);
+
+    const byc = (await client.callTool({ name: 'list_todos', arguments: { group: 'BYC' } })).structuredContent as any;
+    assert.deepEqual(
+      byc.items.map((i: any) => i.title),
+      ['Review Solomon PR']
+    );
+
+    // An explicit group overrides the project's group.
+    await client.callTool({ name: 'update_todo', arguments: { id: viaProject.item.id, group: 'personal' } });
+    const personal = (await client.callTool({ name: 'list_todos', arguments: { group: 'personal' } }))
+      .structuredContent as any;
+    assert.deepEqual(personal.items.map((i: any) => i.title).sort(), ['Book the dentist', 'Review Solomon PR']);
+
+    // Removing it falls back to the project's group.
+    const cleared = (
+      await client.callTool({ name: 'update_todo', arguments: { id: viaProject.item.id, group: null } })
+    ).structuredContent as any;
+    assert.equal(cleared.item.group, 'byc');
   } finally {
     await client.close();
   }

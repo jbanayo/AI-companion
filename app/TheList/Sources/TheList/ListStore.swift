@@ -12,19 +12,38 @@ private let log = Logger(subsystem: "com.jbanayo.thelist", category: "store")
 @Observable
 final class ListStore {
     let todoPath: String
+    let settingsPath: String
     private(set) var snapshot: ListSnapshot
     private(set) var today: String
     /// A short note shown in the footer, e.g. when a write fails. Clears itself.
     private(set) var message: String?
+    /// False for good news ("Exported 12 tasks"), which the footer doesn't show in red.
+    private(set) var messageIsError = true
+    private(set) var exporting = false
+    /// E8.2: which group the popover shows. Remembered across launches.
+    var filter: GroupFilter {
+        didSet {
+            defaults.set(filter.storageKey, forKey: Self.filterKey)
+            refresh()
+        }
+    }
 
+    @ObservationIgnored private var settings = Settings()
+    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var bytes: [UInt8]?
     @ObservationIgnored private var watcher: TodoFileWatcher?
+    @ObservationIgnored private var settingsWatcher: TodoFileWatcher?
     @ObservationIgnored private var dayTimer: Timer?
     /// Where items ticked in this session came from, so unticking puts them back there.
     @ObservationIgnored private var tickedFrom: [String: Priority] = [:]
 
-    init(todoPath: String) {
+    private static let filterKey = "selectedGroup"
+
+    init(todoPath: String, defaults: UserDefaults = .standard) {
         self.todoPath = todoPath
+        self.settingsPath = TheListCore.settingsPath(forTodoPath: todoPath)
+        self.defaults = defaults
+        self.filter = GroupFilter(storageKey: defaults.string(forKey: Self.filterKey) ?? "")
         let today = TheListCore.today()
         self.today = today
         self.snapshot = makeSnapshot(parseDocument([]), today: today)
@@ -36,12 +55,20 @@ final class ListStore {
         try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
 
         archive()
+        settings = readSettings(path: settingsPath)
         reload()
         let watcher = TodoFileWatcher(path: todoPath) { [weak self] bytes in
             Task { @MainActor in self?.apply(bytes) }
         }
         watcher.start()
         self.watcher = watcher
+
+        // Groups edited by hand, or by Claude, show up without a restart.
+        let settingsWatcher = TodoFileWatcher(path: settingsPath) { [weak self] _ in
+            Task { @MainActor in self?.reloadSettings() }
+        }
+        settingsWatcher.start()
+        self.settingsWatcher = settingsWatcher
 
         // "Due today" becomes "overdue" at midnight without the file changing.
         dayTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
@@ -71,12 +98,61 @@ final class ListStore {
         write { try setPriority(todoPath: path, ref, priority) }
     }
 
-    /// E5.4. Calls `done(true)` once the item is in the file.
+    /// E8.3: nil takes the `group` key off.
+    func setGroup(_ item: ItemView, _ groupId: String?) {
+        let ref = ItemRef(item), path = todoPath
+        write { try TheListCore.setGroup(todoPath: path, ref, groupId) }
+    }
+
+    /// E8.3: adds a group to settings.json and shows it. Calls `done(true)` once it's saved.
+    func addGroup(_ name: String, done: @escaping @MainActor (Bool) -> Void) {
+        let path = settingsPath
+        Task.detached {
+            let outcome = Result { try TheListCore.addGroup(name: name, settingsPath: path) }
+            await MainActor.run {
+                switch outcome {
+                case let .success(group):
+                    self.reloadSettings()
+                    self.filter = .group(group.id)
+                    done(true)
+                case let .failure(error):
+                    self.show("Couldn't add the group: \(error)")
+                    done(false)
+                }
+            }
+        }
+    }
+
+    /// E8.4: one-way copy into Apple Reminders.
+    func exportReminders() {
+        guard !exporting else { return }
+        exporting = true
+        let path = todoPath, groups = settings.groups, today = today
+        Task.detached {
+            let outcome: Result<RemindersExport.Outcome, Error>
+            do {
+                outcome = .success(try await RemindersExport.run(todoPath: path, groups: groups, today: today))
+            } catch {
+                outcome = .failure(error)
+            }
+            await MainActor.run {
+                self.exporting = false
+                self.reload()
+                switch outcome {
+                case let .success(result): self.show(result.summary, isError: false)
+                case let .failure(error): self.show("Couldn't export: \(error)")
+                }
+            }
+        }
+    }
+
+    /// E5.4. Calls `done(true)` once the item is in the file. Files it in the group showing, if any.
     func add(_ title: String, done: @escaping @MainActor (Bool) -> Void) {
         let path = todoPath, today = today
+        let group: String? = if case let .group(id) = snapshot.filter { id } else { nil }
         Task.detached {
             do {
-                let id = try quickAdd(todoPath: path, title: title, today: today)
+                let id = try quickAdd(todoPath: path, title: title, group: group, today: today)
                 await MainActor.run {
                     self.reload()
                     done(id != nil)
@@ -120,9 +196,10 @@ final class ListStore {
         }
     }
 
-    private func show(_ text: String) {
-        log.error("\(text, privacy: .public)")
+    private func show(_ text: String, isError: Bool = true) {
+        if isError { log.error("\(text, privacy: .public)") } else { log.info("\(text, privacy: .public)") }
         message = text
+        messageIsError = isError
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(5))
             if self?.message == text { self?.message = nil }
@@ -138,9 +215,20 @@ final class ListStore {
     private func apply(_ bytes: [UInt8]?) {
         guard bytes != self.bytes || self.bytes == nil else { return }
         self.bytes = bytes
-        snapshot = makeSnapshot(parseDocument(bytes ?? []), today: today)
-        let open = snapshot.groups.reduce(0) { $0 + $1.count }
-        log.info("reloaded: \(open) open, badge \(self.snapshot.badge.count), alert \(self.snapshot.badge.alert)")
+        refresh()
+        log.info("reloaded: \(self.snapshot.openCount) open, badge \(self.snapshot.badge.count), alert \(self.snapshot.badge.alert)")
+    }
+
+    private func reloadSettings() {
+        let next = readSettings(path: settingsPath)
+        guard next != settings else { return }
+        settings = next
+        refresh()
+        log.info("settings: \(next.groups.count) groups")
+    }
+
+    private func refresh() {
+        snapshot = makeSnapshot(parseDocument(bytes ?? []), today: today, groups: settings.groups, filter: filter)
     }
 
     private func checkDay() {
@@ -148,7 +236,7 @@ final class ListStore {
         guard now != today else { return }
         today = now
         archive() // once a day; the watcher picks up the rewrite
-        snapshot = makeSnapshot(parseDocument(bytes ?? []), today: today)
+        refresh()
     }
 
     /// E7.2: move Done items older than 14 days into data/archive/ (spec §3.6).

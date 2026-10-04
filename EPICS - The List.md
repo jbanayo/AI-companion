@@ -38,8 +38,9 @@ Two rules on top of the per-story pick:
 | **E5 — Acting on tasks** | Tick, re-prioritize, quick-add, click through to links | 4 | M2 |
 | **E6 — The dog** | Draggable pixel dog that reacts to the list | 6 | M3 |
 | **E7 — Polish** | Settings, archive, session resume, launch at login, widget | 5 | M4 |
+| **E8 — Groups & Reminders** | Split tasks into groups (BYC, personal, …); one-way export to Apple Reminders | 4 | M4 |
 
-**Total:** 34 stories. Rough effort: M1 ≈ 3 days, M2 ≈ 3 days, M3 ≈ 3 days, M4 ≈ 3 days.
+**Total:** 38 stories. Rough effort: M1 ≈ 3 days, M2 ≈ 3 days, M3 ≈ 3 days, M4 ≈ 3 days.
 
 ---
 
@@ -303,6 +304,35 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 *As me, I want my top tasks visible on the desktop without clicking anything.*
 - [ ] A WidgetKit widget showing the top 5 items by effective priority.
 - [ ] Clicking a task opens its link.
+
+## E8 — Groups & Reminders
+
+*Added 2026-10-01 (PRD A10, A11).*
+
+### E8.1 Group key and groups in settings · M · **Opus** · [A10]
+*As me, I want my tasks to know whether they're BYC work or a personal project.*
+- [x] Spec 1.1: a `group` key (§2.6, pair order §3.3) and groups in `data/settings.json` (§2.8). The effective group is the `group` key, else the group that lists the task's project, else none.
+- [x] MCP: `add_todo` and `update_todo` take `group`. `list_todos` filters by effective group, and each item reports it. `get_settings` returns the groups.
+- [x] Swift: `effectiveGroup`, `readSettings`, and `makeSnapshot(…, groups:, filter:)` in TheListCore. Covered by the new write fixtures `add_with_group` and `update_sets_group`, `fixture-check`, and the TS tests.
+
+### E8.2 Group picker · S · **Sonnet** · [A10]
+*As me, I want to look at just BYC, or just my personal projects.*
+- [x] The header title is a menu: All, each group with its open count, Ungrouped (when there is anything ungrouped), and New Group…. The choice is remembered.
+- [x] Quick-add files a task in the group showing. The badge still counts every group.
+- [x] Checked with `--render --group byc` and `--selftest`.
+
+### E8.3 New group, move to group · S · **Sonnet** · [A10]
+*As me, I want to add a group and move tasks into it without editing files.*
+- [x] New Group… names a group, saves it to `settings.json` with every other key kept, and switches to it. A `settings.json` that isn't valid JSON is never overwritten.
+- [x] Right-click → Move to Group sets the task's `group` key. Remove from Group takes the key off again.
+- [x] Groups edited by hand, or by Claude, show up live (the app watches `settings.json`).
+
+### E8.4 Export to Reminders · M · **Opus** · [A11]
+*As me, I want my list in Apple Reminders so it's on my phone.*
+- [x] Export to Reminders in the footer, using EventKit. Lists are named "The List · <group>", or "The List" for ungrouped tasks. P0/P1/P2/P3 become high/medium/low/none. A real due date becomes an all-day due date. Link becomes the URL. Note and body lines become the notes, with the task id at the end.
+- [x] `data/reminders-map.json` maps task ids to reminders, so exporting again updates them. A task ticked in The List gets its reminder ticked. Nothing is unticked or deleted.
+- [x] The mapping, `reminderDraft`, is covered by `fixture-check`.
+- [ ] Checked by hand in the real app: grant permission, export, export again (no duplicates), tick a task, export (the reminder is ticked).
 
 > **Checkpoint — M4 done.** v1 complete.
 

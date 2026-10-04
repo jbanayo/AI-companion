@@ -1,0 +1,19 @@
+{
+  "idSequence": [
+    "t_0100"
+  ],
+  "ops": [
+    {
+      "op": "add",
+      "item": {
+        "title": "Book the dentist",
+        "priority": "P2",
+        "added": "2026-10-01",
+        "project": "health",
+        "group": "personal",
+        "src": "manual",
+        "link": "https://example.com"
+      }
+    }
+  ]
+}

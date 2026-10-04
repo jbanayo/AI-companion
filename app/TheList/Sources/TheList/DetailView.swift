@@ -6,6 +6,8 @@ import TheListCore
 struct DetailView: View {
     let item: ItemView
     let today: String
+    /// The task's effective group (E8.1), shown as a chip.
+    var group: TaskGroup?
     let actions: PopoverActions
     let back: () -> Void
 
@@ -54,8 +56,16 @@ struct DetailView: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if item.meta["project"] != nil || (item.meta["due"] != nil && !item.done) {
+            if group != nil || item.meta["project"] != nil || (item.meta["due"] != nil && !item.done) {
                 HStack(spacing: 6) {
+                    if let group {
+                        Text(group.name)
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                            .foregroundStyle(.secondary)
+                    }
                     if let project = item.meta["project"] {
                         Text(project)
                             .font(.caption)

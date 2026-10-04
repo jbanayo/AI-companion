@@ -22,7 +22,7 @@ public enum Priority: String, Sendable, CaseIterable {
 }
 
 /// The known metadata keys, in the canonical order spec §3.3 requires on render.
-public let knownKeys = ["due", "done", "added", "project", "src", "link", "note"]
+public let knownKeys = ["due", "done", "added", "project", "group", "src", "link", "note"]
 
 /// Metadata pairs with JavaScript `Map` semantics: setting an existing key keeps its position.
 /// Unknown keys are written back in this order, so it has to survive edits.

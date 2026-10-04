@@ -1,0 +1,19 @@
+{
+  "idSequence": [],
+  "ops": [
+    {
+      "op": "update",
+      "id": "t_a",
+      "fields": {
+        "group": "personal"
+      }
+    },
+    {
+      "op": "update",
+      "id": "t_b",
+      "fields": {
+        "group": null
+      }
+    }
+  ]
+}

@@ -55,13 +55,23 @@ public func setPriority(todoPath: String, _ ref: ItemRef, _ priority: Priority) 
     try act(todoPath, ref) { doc, id in updateTodo(doc, id: id, UpdateFields(priority: priority)) }
 }
 
+/// E8.3: put the item in a group, or take its `group` key off (nil), which drops it back to its
+/// project's group, if any.
+@discardableResult
+public func setGroup(todoPath: String, _ ref: ItemRef, _ groupId: String?) throws -> ActionResult {
+    try act(todoPath, ref) { doc, id in
+        updateTodo(doc, id: id, UpdateFields(group: groupId.map(FieldChange.set) ?? .remove))
+    }
+}
+
 /// E5.4: quick-add as P2 with `src:manual`. No duplicate check: a hand-typed add is deliberate.
+/// E8.2: `group` files it in the group the popover is showing.
 /// Returns the new id, or nil if the title is blank.
 @discardableResult
-public func quickAdd(todoPath: String, title: String, today: String = today()) throws -> String? {
+public func quickAdd(todoPath: String, title: String, group: String? = nil, today: String = today()) throws -> String? {
     let title = sanitizeText(title)
     guard !title.isEmpty else { return nil }
     return try withTodoFile(at: todoPath) { doc in
-        addTodo(doc, AddInput(title: title, priority: .p2, src: "manual", added: today)).fields.id
+        addTodo(doc, AddInput(title: title, priority: .p2, group: group, src: "manual", added: today)).fields.id
     }
 }

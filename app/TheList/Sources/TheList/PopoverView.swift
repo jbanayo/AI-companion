@@ -7,15 +7,23 @@ struct PopoverActions {
     var open: @MainActor (ItemView) -> Void = { _ in }
     var move: @MainActor (ItemView, Priority) -> Void = { _, _ in }
     var add: @MainActor (String, @escaping @MainActor (Bool) -> Void) -> Void = { _, done in done(false) }
+    /// E8.2–E8.3: show a group, put a task in one (nil takes its `group` key off), make a new one.
+    var selectFilter: @MainActor (GroupFilter) -> Void = { _ in }
+    var setGroup: @MainActor (ItemView, String?) -> Void = { _, _ in }
+    var addGroup: @MainActor (String, @escaping @MainActor (Bool) -> Void) -> Void = { _, done in done(false) }
+    /// E8.4
+    var exportReminders: @MainActor () -> Void = {}
+    var exporting = false
     var quit: @MainActor () -> Void = {}
     var openURL: @MainActor (URL) -> Void = { _ in }
     var reveal: @MainActor (String) -> Void = { _ in }
     var todoPath = ""
     var message: String?
+    var messageIsError = true
 }
 
-/// The popover: quick-add (E5.4), the four priority groups (E4.3), a collapsible Done section (E5.1),
-/// and a task's details when one is clicked.
+/// The popover: a group picker (E8.2), quick-add (E5.4), the four priority groups (E4.3), a
+/// collapsible Done section (E5.1), and a task's details when one is clicked.
 struct PopoverView: View {
     let snapshot: ListSnapshot
     let today: String
@@ -28,13 +36,19 @@ struct PopoverView: View {
     @State var selected: String?
     @State private var draft = ""
     @State private var adding = false
+    /// Naming a new group in the header (E8.3).
+    @State private var naming = false
+    @State private var groupDraft = ""
+    @FocusState private var groupFieldFocused: Bool
     @State private var contentHeight: CGFloat = 0
     private let maxListHeight: CGFloat = 460
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let item = selectedItem {
-                fitting { DetailView(item: item, today: today, actions: actions) { selected = nil } }
+                fitting {
+                    DetailView(item: item, today: today, group: snapshot.group(of: item), actions: actions) { selected = nil }
+                }
             } else {
                 header
                 quickAdd
@@ -72,16 +86,71 @@ struct PopoverView: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("The List").font(.headline)
-            Spacer()
-            let open = snapshot.groups.reduce(0) { $0 + $1.count }
-            Text(open == 1 ? "1 open" : "\(open) open")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            if naming {
+                TextField("New group name", text: $groupDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($groupFieldFocused)
+                    .onSubmit(saveGroup)
+                    .onExitCommand { naming = false }
+                Text("Cancel")
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                    .onTapGesture { naming = false }
+                    .accessibilityAddTraits(.isButton)
+            } else {
+                groupPicker
+                Spacer()
+                let open = snapshot.openCount
+                Text(open == 1 ? "1 open" : "\(open) open")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.top, 10)
         .padding(.bottom, 6)
+    }
+
+    /// "The List ⌄" when showing everything, else the group's name.
+    private var groupPicker: some View {
+        Menu {
+            filterButton(.all, "All")
+            if !snapshot.taskGroups.isEmpty { Divider() }
+            ForEach(snapshot.taskGroups) { group in filterButton(.group(group.id), group.name) }
+            if (snapshot.openCounts[.ungrouped] ?? 0) > 0 || snapshot.filter == .ungrouped {
+                filterButton(.ungrouped, "Ungrouped")
+            }
+            Divider()
+            Button("New Group…") {
+                groupDraft = ""
+                naming = true
+                groupFieldFocused = true
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(snapshot.filter == .all ? "The List" : snapshot.filterName).font(.headline)
+                Image(systemName: "chevron.down").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("Group: \(snapshot.filterName)")
+    }
+
+    private func filterButton(_ filter: GroupFilter, _ name: String) -> some View {
+        let title = "\(name) (\(snapshot.openCounts[filter] ?? 0))"
+        return Button {
+            actions.selectFilter(filter)
+        } label: {
+            if snapshot.filter == filter { Label(title, systemImage: "checkmark") } else { Text(title) }
+        }
+    }
+
+    private func saveGroup() {
+        guard !groupDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        actions.addGroup(groupDraft) { added in if added { naming = false } }
     }
 
     private var quickAdd: some View {
@@ -109,7 +178,7 @@ struct PopoverView: View {
                     .padding(.vertical, 16)
             } else {
                 ForEach(snapshot.groups) { group in
-                    GroupSection(group: group, today: today, actions: actions, select: select)
+                    GroupSection(group: group, snapshot: snapshot, today: today, actions: actions, select: select)
                 }
                 if !snapshot.done.isEmpty { doneSection }
             }
@@ -136,7 +205,7 @@ struct PopoverView: View {
 
             if showDone {
                 ForEach(snapshot.done, id: \.line) { item in
-                    ItemRow(item: item, today: today, actions: actions, select: select)
+                    ItemRow(item: item, snapshot: snapshot, today: today, actions: actions, select: select)
                 }
             }
         }
@@ -147,10 +216,20 @@ struct PopoverView: View {
             if let message = actions.message {
                 Text(message)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(actions.messageIsError ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
                     .lineLimit(2)
             }
             Spacer()
+            if actions.exporting {
+                ProgressView().controlSize(.small)
+            } else if actions.message == nil {
+                Text("Export to Reminders")
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                    .onTapGesture { actions.exportReminders() }
+                    .accessibilityAddTraits(.isButton)
+                    .help("Copy open tasks into Apple Reminders, one list per group. Running it again updates them.")
+            }
             Text("Quit")
                 .foregroundStyle(.secondary)
                 .contentShape(Rectangle())
@@ -164,6 +243,7 @@ struct PopoverView: View {
 
 private struct GroupSection: View {
     let group: ListGroup
+    let snapshot: ListSnapshot
     let today: String
     let actions: PopoverActions
     let select: (ItemView) -> Void
@@ -182,7 +262,7 @@ private struct GroupSection: View {
             .padding(.bottom, 2)
             .opacity(group.count == 0 ? 0.45 : 1)
             ForEach(group.items, id: \.line) { item in
-                ItemRow(item: item, today: today, actions: actions, select: select)
+                ItemRow(item: item, snapshot: snapshot, today: today, actions: actions, select: select)
             }
         }
     }
@@ -190,6 +270,7 @@ private struct GroupSection: View {
 
 private struct ItemRow: View {
     let item: ItemView
+    let snapshot: ListSnapshot
     let today: String
     let actions: PopoverActions
     let select: (ItemView) -> Void
@@ -251,6 +332,24 @@ private struct ItemRow: View {
                         if current { Label(menuTitle(priority), systemImage: "checkmark") } else { Text(menuTitle(priority)) }
                     }
                     .disabled(current)
+                }
+            }
+            if !snapshot.taskGroups.isEmpty {
+                Divider()
+                Menu("Move to Group") {
+                    let current = snapshot.group(of: item)?.id
+                    ForEach(snapshot.taskGroups) { group in
+                        Button {
+                            actions.setGroup(item, group.id)
+                        } label: {
+                            if group.id == current { Label(group.name, systemImage: "checkmark") } else { Text(group.name) }
+                        }
+                        .disabled(group.id == current && item.meta["group"] != nil)
+                    }
+                    if item.meta["group"] != nil {
+                        Divider()
+                        Button("Remove from Group") { actions.setGroup(item, nil) }
+                    }
                 }
             }
         }

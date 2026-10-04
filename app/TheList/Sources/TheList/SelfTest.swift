@@ -22,7 +22,13 @@ enum SelfTest {
 
         """.utf8).write(to: URL(fileURLWithPath: path))
 
-        let store = ListStore(todoPath: path)
+        try! Data(#"{"proactive":true,"groups":[{"id":"byc","name":"BYC","projects":["solomon"]}]}"#.utf8)
+            .write(to: dir.appendingPathComponent("settings.json"))
+        let suite = "the-list-selftest-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let store = ListStore(todoPath: path, defaults: defaults)
         store.start()
         var failures = 0
 
@@ -80,6 +86,34 @@ enum SelfTest {
         store.toggle(item("Typed in VS Code")!)
         await expect("tick a hand-typed item: it gets an id and is done") {
             item("Typed in VS Code")?.done == true && file().range(of: #"- \[x\] Typed in VS Code \{id:t_[0-9a-f]{4} done:"#, options: .regularExpression) != nil
+        }
+
+        // E8.2–E8.3: groups.
+        store.setGroup(item("Quick one")!, "byc")
+        await expect("move to group: the line gets group:byc") {
+            store.snapshot.group(of: item("Quick one")!)?.id == "byc" && file().contains("Quick one {id:") && file().contains("group:byc src:manual}")
+        }
+
+        store.filter = .group("byc")
+        await expect("filter: only BYC shows; the badge still counts everything") {
+            store.snapshot.groups.flatMap(\.items).map(\.title) == ["Quick one"] && store.snapshot.badge.count == 1
+        }
+
+        var groupAdded: Bool?
+        store.addGroup("Health") { groupAdded = $0 }
+        await expect("new group: saved to settings.json and showing") {
+            groupAdded == true && store.snapshot.filter == .group("health") && store.snapshot.isEmpty
+                && ((try? String(contentsOf: dir.appendingPathComponent("settings.json"), encoding: .utf8)) ?? "").contains("\"Health\"")
+        }
+
+        store.add("Gym") { _ in }
+        await expect("quick-add while a group shows: filed in that group") {
+            item("Gym") != nil && file().contains("group:health src:manual}")
+        }
+
+        try! Data(#"{"proactive":true,"groups":[]}"#.utf8).write(to: dir.appendingPathComponent("settings.json"))
+        await expect("groups removed by hand: back to All") {
+            store.snapshot.filter == .all && store.snapshot.taskGroups.isEmpty && item("Review the PR") != nil
         }
 
         try? FileManager.default.removeItem(at: dir)

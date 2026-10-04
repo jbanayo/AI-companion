@@ -5,7 +5,7 @@ export type Priority = 'P0' | 'P1' | 'P2' | 'P3';
 export type Section = Priority | 'Done';
 
 /** The known metadata keys, in the canonical order §3.3 requires on render. */
-export const KNOWN_KEYS = ['due', 'done', 'added', 'project', 'src', 'link', 'note'] as const;
+export const KNOWN_KEYS = ['due', 'done', 'added', 'project', 'group', 'src', 'link', 'note'] as const;
 export type KnownKey = (typeof KNOWN_KEYS)[number];
 
 export interface ItemFields {

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import TheListCore
 
-/// `TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark] [--show-done] [--detail "task title"]`
+/// `TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark] [--show-done] [--detail "task title"] [--group id]`
 /// Draws the popover and the menu bar icon for a TODO.md into PNGs without launching the app,
 /// so layout can be checked from the command line.
 enum Render {
@@ -20,7 +20,9 @@ enum Render {
         let dark = args.contains("--dark")
 
         let bytes = (try? Data(contentsOf: URL(fileURLWithPath: todoPath))).map { [UInt8]($0) } ?? []
-        let snapshot = makeSnapshot(parseDocument(bytes), today: today)
+        let groups = readSettings(path: settingsPath(forTodoPath: todoPath)).groups
+        let filter = value("--group").map(GroupFilter.init(storageKey:)) ?? .all
+        let snapshot = makeSnapshot(parseDocument(bytes), today: today, groups: groups, filter: filter)
 
         let detail = value("--detail").flatMap { title in
             (snapshot.groups.flatMap(\.items) + snapshot.done).first { $0.title == title }.map(PopoverView.key)

@@ -123,7 +123,8 @@ for dir in cases("write") {
                 addTodo(doc, AddInput(
                     title: item["title"] as! String,
                     priority: (item["priority"] as? String).flatMap(Priority.init(rawValue:)),
-                    due: item["due"] as? String, project: item["project"] as? String, src: item["src"] as? String,
+                    due: item["due"] as? String, project: item["project"] as? String, group: item["group"] as? String,
+                    src: item["src"] as? String,
                     link: item["link"] as? String, note: item["note"] as? String, added: item["added"] as? String
                 ), idGen: nextId)
             case "complete":
@@ -136,7 +137,8 @@ for dir in cases("write") {
                 let fields = UpdateFields(
                     title: f["title"] as? String,
                     priority: (f["priority"] as? String).flatMap(Priority.init(rawValue:)),
-                    due: change(f, "due"), project: change(f, "project"), link: change(f, "link"), note: change(f, "note")
+                    due: change(f, "due"), project: change(f, "project"), group: change(f, "group"),
+                    link: change(f, "link"), note: change(f, "note")
                 )
                 guard updateTodo(doc, id: id, fields) != nil else { return "update: no item \(id)" }
             case "remove":
@@ -661,6 +663,154 @@ check("quick-add adds at P2 with src:manual; a blank title does nothing") {
     let before = try read(path)
     if try quickAdd(todoPath: path, title: " \n ", today: monday) != nil { return "blank title was added" }
     return diff("after blank", before, try read(path))
+}
+
+// MARK: - Groups (E8.1–E8.3)
+
+print("Groups:")
+
+let testGroups = [
+    TaskGroup(id: "byc", name: "BYC", projects: ["Solomon", "prismo"]),
+    TaskGroup(id: "personal", name: "Personal projects", projects: ["personal"]),
+]
+
+func groupedDoc() -> Document {
+    parseDocument(Array("""
+    # Todo
+
+    ## P0 — Now
+    - [ ] Overdue personal {id:t_1 due:2026-09-01 group:personal}
+
+    ## P1 — This week
+    - [ ] Solomon review {id:t_2 project:SOLOMON}
+    - [ ] Moved out of BYC {id:t_3 project:prismo group:Personal}
+
+    ## P2 — Soon
+    - [ ] Loose end {id:t_4}
+    - [ ] Unknown group falls back {id:t_5 project:prismo group:gone}
+
+    ## Done
+    - [x] Shipped prismo {id:t_6 project:prismo done:2026-09-27}
+
+    """.utf8))
+}
+
+check("effectiveGroup: explicit key, then project, then none; case-insensitive") {
+    let items = deriveViews(groupedDoc()).items
+    let got = items.map { effectiveGroup($0, groups: testGroups)?.id ?? "-" }
+    let want = ["personal", "byc", "personal", "-", "byc", "byc"]
+    return got == want ? nil : "expected \(want), got \(got)"
+}
+
+check("snapshot filters by group; the badge still counts every group") {
+    let all = makeSnapshot(groupedDoc(), today: "2026-09-28", groups: testGroups)
+    let byc = makeSnapshot(groupedDoc(), today: "2026-09-28", groups: testGroups, filter: .group("byc"))
+    let loose = makeSnapshot(groupedDoc(), today: "2026-09-28", groups: testGroups, filter: .ungrouped)
+    let titles = { (s: ListSnapshot) in s.groups.flatMap(\.items).map(\.title) }
+    if titles(byc) != ["Solomon review", "Unknown group falls back"] { return "byc open: \(titles(byc))" }
+    if byc.done.map(\.title) != ["Shipped prismo"] { return "byc done: \(byc.done.map(\.title))" }
+    if titles(loose) != ["Loose end"] || !loose.done.isEmpty { return "ungrouped: \(titles(loose))" }
+    if byc.badge != all.badge || all.badge != Badge(count: 3, alert: true) { return "badge: \(all.badge) vs \(byc.badge)" }
+    let counts = all.openCounts
+    if counts != [.all: 5, .group("byc"): 2, .group("personal"): 2, .ungrouped: 1] { return "counts: \(counts)" }
+    if byc.filterName != "BYC" || byc.openCount != 2 { return "byc name/count: \(byc.filterName) \(byc.openCount)" }
+    return nil
+}
+
+check("a filter for a group that's gone shows All") {
+    let s = makeSnapshot(groupedDoc(), today: "2026-09-28", groups: testGroups, filter: .group("deleted"))
+    if s.filter != .all || s.openCount != 5 { return "filter \(s.filter), \(s.openCount) open" }
+    for f in [GroupFilter.all, .ungrouped, .group("byc")] where GroupFilter(storageKey: f.storageKey) != f {
+        return "storage key round trip failed for \(f)"
+    }
+    return nil
+}
+
+check("readSettings: groups parsed, bad entries dropped, broken file gives defaults") {
+    let path = settingsPath(forTodoPath: try tempTodoPath())
+    if readSettings(path: path) != Settings() { return "missing file" }
+    try write(path, #"{"proactive":false,"groups":[{"id":"byc","name":"BYC","projects":["solomon",3]},{"name":"no id"},{"id":"BYC"},{"id":"home"}]}"#)
+    let want = Settings(proactive: false, groups: [
+        TaskGroup(id: "byc", name: "BYC", projects: ["solomon"]), TaskGroup(id: "home", name: "home"),
+    ])
+    if readSettings(path: path) != want { return "parsed: \(readSettings(path: path))" }
+    try write(path, "{ not json")
+    return readSettings(path: path) == Settings() ? nil : "broken file"
+}
+
+check("addGroup keeps other keys, picks a unique id, and won't touch a broken file") {
+    let path = settingsPath(forTodoPath: try tempTodoPath())
+    try write(path, #"{"proactive":false,"petVisible":true,"groups":[{"id":"health","name":"Old health","projects":["gym"]}]}"#)
+    let g = try addGroup(name: "  Health ", settingsPath: path)
+    if g.id != "health-2" || g.name != "Health" { return "added \(g)" }
+    let again = try addGroup(name: "health", settingsPath: path)
+    if again != g { return "re-adding returned \(again)" }
+    let s = readSettings(path: path)
+    if s.proactive != false || s.groups.map(\.id) != ["health", "health-2"] || s.groups[0].projects != ["gym"] { return "\(s)" }
+    let json = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
+    if json["petVisible"] as? Bool != true { return "lost petVisible" }
+    if groupSlug("Health & Fitness!") != "health-fitness" || groupSlug("???") != "group" { return "slug" }
+
+    let fresh = settingsPath(forTodoPath: try tempTodoPath())
+    _ = try addGroup(name: "BYC", settingsPath: fresh)
+    if readSettings(path: fresh) != Settings(proactive: true, groups: [TaskGroup(id: "byc", name: "BYC")]) { return "fresh file" }
+
+    try write(path, "{ half typed")
+    do {
+        _ = try addGroup(name: "X", settingsPath: path)
+        return "wrote over a broken file"
+    } catch {}
+    return try read(path) == "{ half typed" ? nil : "broken file changed"
+}
+
+check("setGroup sets and clears the group key; quick-add files into a group") {
+    let path = try tempTodoPath()
+    try write(path, "# Todo\n\n## P2 — Soon\n- [ ] Task A {id:t_a project:prismo}\n")
+    try setGroup(todoPath: path, ref(path, title: "Task A"), "personal")
+    if let d = diff("set", "# Todo\n\n## P2 — Soon\n- [ ] Task A {id:t_a project:prismo group:personal}\n", try read(path)) { return d }
+    try setGroup(todoPath: path, ref(path, title: "Task A"), nil)
+    if let d = diff("cleared", "# Todo\n\n## P2 — Soon\n- [ ] Task A {id:t_a project:prismo}\n", try read(path)) { return d }
+    guard let id = try quickAdd(todoPath: path, title: "Gym", group: "health", today: monday) else { return "nothing added" }
+    return diff("quick-add", "# Todo\n\n## P2 — Soon\n- [ ] Task A {id:t_a project:prismo}\n- [ ] Gym {id:\(id) added:2026-09-28 group:health src:manual}\n", try read(path))
+}
+
+// MARK: - Reminders mapping (E8.4)
+
+print("Reminders mapping:")
+
+check("reminderDraft maps priority, due, link, notes and list") {
+    let doc = parseDocument(Array("""
+    # Todo
+
+    ## P1 — This week
+    - [ ] Review PR {id:t_r due:2026-10-05 project:solomon link:https://example.com/pr/1 note:"OCR first"}
+      Check the fallback path.
+    - [ ] Due today {id:t_t due:2026-09-28 link:"vscode://file/Users/me/My Docs/a.md:3"}
+
+    ## P3 — Someday
+    - [ ] Someday {id:t_s link:~/notes.md}
+    - [ ] No id yet
+
+    ## Done
+    - [x] Shipped {id:t_d done:2026-09-27 group:personal}
+
+    """.utf8))
+    let items = deriveViews(doc).items
+    let drafts = items.map { reminderDraft(for: $0, groups: testGroups, today: "2026-09-28") }
+
+    guard let r = drafts[0] else { return "no draft for t_r" }
+    let want = ReminderDraft(
+        taskId: "t_r", title: "Review PR", listName: "The List · BYC", priority: 5,
+        due: DateComponents(year: 2026, month: 10, day: 5), url: URL(string: "https://example.com/pr/1"),
+        notes: "OCR first\n\nCheck the fallback path.\n\nThe List · t_r", completed: false
+    )
+    if r != want { return "t_r:\n\(r)\nwant:\n\(want)" }
+    if drafts[1]?.priority != 1 || drafts[1]?.listName != "The List" { return "due today: \(String(describing: drafts[1]))" }
+    if drafts[1]?.url?.absoluteString != "vscode://file/Users/me/My%20Docs/a.md:3" { return "vscode url: \(String(describing: drafts[1]?.url))" }
+    if drafts[2]?.priority != 0 || drafts[2]?.url?.isFileURL != true || drafts[2]?.due != nil { return "someday: \(String(describing: drafts[2]))" }
+    if drafts[3] != nil { return "an item without an id got a draft" }
+    if drafts[4]?.completed != true || drafts[4]?.listName != "The List · Personal projects" { return "done: \(String(describing: drafts[4]))" }
+    return nil
 }
 
 print("\n\(passed) passed, \(failed) failed")

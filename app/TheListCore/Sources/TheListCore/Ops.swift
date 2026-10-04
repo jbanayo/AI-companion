@@ -135,17 +135,20 @@ public struct AddInput: Sendable {
     public var priority: Priority?
     public var due: String?
     public var project: String?
+    public var group: String?
     public var src: String?
     public var link: String?
     public var note: String?
     public var added: String?
 
     public init(title: String, priority: Priority? = nil, due: String? = nil, project: String? = nil,
-                src: String? = nil, link: String? = nil, note: String? = nil, added: String? = nil) {
+                group: String? = nil, src: String? = nil, link: String? = nil, note: String? = nil,
+                added: String? = nil) {
         self.title = title
         self.priority = priority
         self.due = due
         self.project = project
+        self.group = group
         self.src = src
         self.link = link
         self.note = note
@@ -165,6 +168,7 @@ public func addTodo(_ doc: Document, _ input: AddInput, idGen: () -> String = ge
     if let due = nonEmpty(input.due) { meta["due"] = due }
     meta["added"] = input.added ?? today()
     if let project = nonEmpty(input.project) { meta["project"] = sanitizeText(project) }
+    if let group = nonEmpty(input.group) { meta["group"] = sanitizeText(group) }
     meta["src"] = input.src ?? "manual"
     if let link = nonEmpty(input.link) { meta["link"] = sanitizeText(link) }
     if let note = nonEmpty(input.note) { meta["note"] = sanitizeText(note) }
@@ -214,15 +218,18 @@ public struct UpdateFields: Sendable {
     public var priority: Priority?
     public var due: FieldChange = .keep
     public var project: FieldChange = .keep
+    public var group: FieldChange = .keep
     public var link: FieldChange = .keep
     public var note: FieldChange = .keep
 
     public init(title: String? = nil, priority: Priority? = nil, due: FieldChange = .keep,
-                project: FieldChange = .keep, link: FieldChange = .keep, note: FieldChange = .keep) {
+                project: FieldChange = .keep, group: FieldChange = .keep, link: FieldChange = .keep,
+                note: FieldChange = .keep) {
         self.title = title
         self.priority = priority
         self.due = due
         self.project = project
+        self.group = group
         self.link = link
         self.note = note
     }
@@ -241,7 +248,8 @@ public func updateTodo(_ doc: Document, id: String, _ fields: UpdateFields) -> I
     let item = item(at: idx, in: doc)
 
     if let title = fields.title { item.fields.title = sanitizeText(title) }
-    for (key, change) in [("due", fields.due), ("project", fields.project), ("link", fields.link), ("note", fields.note)] {
+    for (key, change) in [("due", fields.due), ("project", fields.project), ("group", fields.group), ("link", fields.link),
+                         ("note", fields.note)] {
         switch change {
         case .keep: break
         case .remove: item.fields.meta[key] = nil

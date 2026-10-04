@@ -43,9 +43,9 @@ A small macOS menu bar app called **The List**. Claude writes to it. The list it
 
 **Non-goals (v1)**
 - Team or shared lists. This is just for me.
-- Syncing to iPhone or other devices.
+- Syncing to iPhone or other devices. *(The one-way Reminders export, A11, puts a copy on the iPhone through iCloud. That copy is read-only as far as The List is concerned: nothing syncs back.)*
 - Mirroring ClickUp. **The List is the single source of truth for every task, BYC work included** — ClickUp items are linked to, never duplicated or synced.
-- Calendar or reminder integration.
+- Calendar integration, and two-way sync with Reminders. *(Changed 2026-10-01: a one-way export to Apple Reminders is in scope, A11.)*
 - The app calling an LLM itself. All intelligence comes from the Claude session I'm already in.
 
 ## 4. Feasibility: is it doable and quick?
@@ -144,6 +144,8 @@ The app re-sorts automatically when a due date passes: an overdue P1 is shown as
 | A7 | A quick-add field at the top for manual entry. It defaults to P2. |
 | A8 | Settings: file location, launch at login, pet on/off, pet position, archive window, **proactive suggestions on/off** (C9). |
 | A9 | Budget: under 50 MB RAM idle, ~0% CPU idle, app bundle under 20 MB. |
+| A10 | **Groups** *(added 2026-10-01)*. A menu in the popover header switches between All, each group (e.g. BYC, Personal projects), and Ungrouped. Groups live in `data/settings.json`, and each group lists the projects it covers, so a task tagged `project:prismo` shows under BYC without a `group` key. A task's own `group` key overrides its project. The menu can add a new group. Right-click a task to move it to another group. Quick-add files a task in the group showing. The menu bar badge always counts every group. |
+| A11 | **Export to Reminders** *(added 2026-10-01)*. A footer action copies open tasks into Apple Reminders, one list per group ("The List · BYC"). Priority, due date, link and note carry over. Exporting again updates the same reminders instead of adding new ones, and ticks the reminders of tasks finished since. One way only: nothing in Reminders comes back to `TODO.md`, and nothing in Reminders is deleted. |
 
 **Optional:** a macOS **desktop widget** (WidgetKit) showing the top 5 items. Widgets refresh on the system's schedule and have limited interactivity, so they're a secondary view, not the main UI.
 

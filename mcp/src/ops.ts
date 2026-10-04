@@ -43,6 +43,7 @@ export interface AddInput {
   priority?: 'P0' | 'P1' | 'P2' | 'P3';
   due?: string;
   project?: string;
+  group?: string;
   src?: string;
   link?: string;
   note?: string;
@@ -54,6 +55,7 @@ export interface UpdateFields {
   priority?: 'P0' | 'P1' | 'P2' | 'P3';
   due?: string | null;
   project?: string | null;
+  group?: string | null;
   link?: string | null;
   note?: string | null;
 }
@@ -155,6 +157,7 @@ export function addTodo(doc: Document, input: AddInput, idGen: () => string = ge
   if (input.due) meta.set('due', input.due);
   meta.set('added', input.added ?? today());
   if (input.project) meta.set('project', sanitizeText(input.project));
+  if (input.group) meta.set('group', sanitizeText(input.group));
   meta.set('src', input.src ?? 'manual');
   if (input.link) meta.set('link', sanitizeText(input.link));
   if (input.note) meta.set('note', sanitizeText(input.note));
@@ -203,7 +206,7 @@ export function updateTodo(doc: Document, id: string, fields: UpdateFields): Ite
   const item = doc.nodes[idx] as ItemNode;
 
   if (fields.title !== undefined) item.fields.title = sanitizeText(fields.title);
-  for (const key of ['due', 'project', 'link', 'note'] as const) {
+  for (const key of ['due', 'project', 'group', 'link', 'note'] as const) {
     const v = fields[key];
     if (v === null) item.fields.meta.delete(key);
     else if (v !== undefined) item.fields.meta.set(key, sanitizeText(v));
