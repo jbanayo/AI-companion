@@ -8,6 +8,9 @@ enum Entry {
         if let i = CommandLine.arguments.firstIndex(of: "--render") {
             exit(Render.run(Array(CommandLine.arguments[(i + 1)...])))
         }
+        if let i = CommandLine.arguments.firstIndex(of: "--make-iconset"), CommandLine.arguments.indices.contains(i + 1) {
+            exit(Logo.writeIconset(to: CommandLine.arguments[i + 1]))
+        }
         if CommandLine.arguments.contains("--selftest") {
             Task { @MainActor in exit(await SelfTest.run()) }
             RunLoop.main.run()

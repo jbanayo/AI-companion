@@ -10,8 +10,14 @@ bin="$(swift build -c "$config" --show-bin-path)/TheList"
 
 app="build/The List.app"
 rm -rf "$app"
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/TheList"
+
+# The app icon is drawn in code (Logo.swift); turn it into AppIcon.icns.
+iconset="$(mktemp -d)/AppIcon.iconset"
+"$bin" --make-iconset "$iconset"
+iconutil -c icns -o "$app/Contents/Resources/AppIcon.icns" "$iconset"
+rm -rf "$(dirname "$iconset")"
 
 todo_path="$(cd ../.. && pwd)/data/TODO.md"
 sed "s|__TODO_PATH__|${todo_path}|" Info.plist > "$app/Contents/Info.plist"

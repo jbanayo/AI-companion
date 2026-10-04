@@ -10,6 +10,8 @@
 	<string>The List</string>
 	<key>CFBundleExecutable</key>
 	<string>TheList</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

@@ -6,10 +6,6 @@ import TheListCore
 enum MenuBarIcon {
     static func image(for badge: Badge) -> NSImage {
         let tint: NSColor = badge.alert ? .systemRed : .black
-        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
-            .applying(.init(paletteColors: [tint]))
-        let symbol = NSImage(systemSymbolName: "checklist", accessibilityDescription: "The List")!
-            .withSymbolConfiguration(config)!
 
         let text = badge.count > 0 ? "\(badge.count)" as NSString : nil
         let attributes: [NSAttributedString.Key: Any] = [
@@ -17,13 +13,18 @@ enum MenuBarIcon {
             .foregroundColor: tint,
         ]
         let textSize = text?.size(withAttributes: attributes) ?? .zero
+        let glyph = Logo.menuGlyphSize
         let gap: CGFloat = text == nil ? 0 : 3
         let height: CGFloat = 18
-        let size = NSSize(width: ceil(symbol.size.width + gap + textSize.width), height: height)
+        let size = NSSize(width: ceil(glyph + gap + textSize.width), height: height)
 
-        let image = NSImage(size: size, flipped: false) { _ in
-            symbol.draw(in: NSRect(x: 0, y: (height - symbol.size.height) / 2, width: symbol.size.width, height: symbol.size.height))
-            text?.draw(at: NSPoint(x: symbol.size.width + gap, y: (height - textSize.height) / 2), withAttributes: attributes)
+        let image = NSImage(size: size, flipped: true) { _ in
+            guard let cg = NSGraphicsContext.current?.cgContext else { return false }
+            cg.saveGState()
+            cg.translateBy(x: 0, y: (height - glyph) / 2)
+            Logo.drawMenuGlyph(in: cg, color: tint.cgColor)
+            cg.restoreGState()
+            text?.draw(at: NSPoint(x: glyph + gap, y: (height - textSize.height) / 2), withAttributes: attributes)
             return true
         }
         image.isTemplate = !badge.alert // template: follows the menu bar's light/dark appearance

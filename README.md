@@ -37,11 +37,13 @@ Personal project (not a BYC product). Home of **The List**: a macOS menu bar tod
 
 ```bash
 cd app/TheList
-./build-app.sh                  # builds build/The List.app (release), signed for this Mac only
+./build-app.sh                  # builds build/The List.app (release) with its icon, signed for this Mac only
 open "build/The List.app"       # starts it in the menu bar; Quit is in the popover footer
 ```
 
 The app reads `data/TODO.md` (the path is baked into the bundle at build time). To point it somewhere else, launch it with `open --env THE_LIST_TODO_PATH=/path/to/TODO.md "build/The List.app"`. To see the popover without clicking, `$(swift build --show-bin-path)/TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark]` draws it to a PNG (add `--show-done` to open the Done section, `--group <id>` to show one group). `$(swift build --show-bin-path)/TheList --selftest` runs the popover's actions (tick, untick, move, quick-add, an outside edit) through the real store against a scratch list. The app logs each reload under the subsystem `com.jbanayo.thelist`.
+
+The logo (the "Stack" design, chosen 2026-10-04) is drawn in code in `Logo.swift`, which draws both the menu bar glyph and the app icon. `build-app.sh` runs `TheList --make-iconset` and `iconutil` to make `AppIcon.icns`.
 
 **Export to Reminders** asks for Reminders access the first time. It only works from the bundled app, because macOS needs the usage text in `Info.plist`. The app is signed ad hoc, so macOS may ask again after a rebuild. If it says access is denied, turn The List back on in System Settings → Privacy & Security → Reminders.
 
