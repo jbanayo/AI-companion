@@ -209,6 +209,7 @@ struct DetailView: View {
         let by: String? = switch item.meta["src"] {
         case "claude-code": "Claude Code"
         case "claude-desktop": "Claude Desktop"
+        case "codex": "Codex"
         case "manual": "you"
         case let other: other
         }

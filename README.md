@@ -33,6 +33,22 @@ Personal project (not a BYC product). Home of **The List**: a macOS menu bar tod
 | Tests | Node's built-in test runner (`node --test`) for `mcp/`; for `app/`, a `fixture-check` executable for now, XCTest once Xcode is installed. Both run against `spec/fixtures/` (E0.2). | The Command Line Tools ship neither XCTest nor Swift Testing, so `swift run fixture-check` stands in until then. It exits with status 1 on any failure. |
 | Package manager | npm (`mcp/`), Swift Package Manager (`app/`) | `app/TheListCore/` is a Swift package. The app target and the Xcode project come in E4.1. |
 
+### Connecting Claude and Codex
+
+The MCP server runs over stdio from `mcp/dist/index.js` (`npm run build` in `mcp/` first). Each client sets `THE_LIST_SRC`, which tags the tasks it adds:
+
+- **Claude Code:** `claude mcp add the-list -s user -- node "<repo>/mcp/dist/index.js"` (tasks get `src:claude-code`).
+- **Codex:** in `~/.codex/config.toml`, use an absolute path to Node 20, because the Codex app doesn't load the shell's asdf or nvm setup:
+  ```toml
+  [mcp_servers.the-list]
+  command = "/Users/catherinebanayo/.asdf/installs/nodejs/20.14.0/bin/node"
+  args = ["<repo>/mcp/dist/index.js"]
+
+  [mcp_servers.the-list.env]
+  THE_LIST_SRC = "codex"
+  ```
+  Restart Codex after editing.
+
 ### Building and running the app
 
 ```bash
