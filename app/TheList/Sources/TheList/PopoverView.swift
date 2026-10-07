@@ -41,6 +41,8 @@ struct PopoverView: View {
     @State private var groupDraft = ""
     @FocusState private var groupFieldFocused: Bool
     @State private var contentHeight: CGFloat = 0
+    /// The whole popover's height, for `WindowFitter`.
+    @State private var popoverHeight: CGFloat = 0
     private let maxListHeight: CGFloat = 460
 
     var body: some View {
@@ -59,6 +61,10 @@ struct PopoverView: View {
             footer
         }
         .frame(width: 340)
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { popoverHeight = $0 }
+        .background { if scrollable { WindowFitter(height: popoverHeight) } }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     static func key(_ item: ItemView) -> String { item.id ?? "title:\(item.title)" }
