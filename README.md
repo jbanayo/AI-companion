@@ -1,6 +1,6 @@
 # AI Companion
 
-Personal project (not a BYC product). Home of **The List**: a macOS menu bar todo list that Claude fills in, with a draggable pixel dog.
+Personal project. Home of **The List**: a macOS menu bar todo list that Claude fills in, with a draggable pixel dog.
 
 - What and why: [PRD - The List.md](PRD%20-%20The%20List.md)
 - Build plan, story by story: [EPICS - The List.md](EPICS%20-%20The%20List.md)
