@@ -338,6 +338,20 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ---
 
+## E9 — Agent mode
+
+*Added 2026-10-15. The app's display name becomes "The Companion". The bundle id, the MCP server name and the Reminders prefix stay the same.*
+
+### E9.1 Keep agents running · M · **Opus**
+*As me, I want Claude Code and Codex to keep working while the screen is off or the lid is closed, and to see at a glance that they are.*
+- [x] An Agent mode switch above the footer. On: an IOKit `PreventUserIdleSystemSleep` assertion, plus `pmset -a disablesleep 1` through the admin password prompt. Off and Quit undo both.
+- [x] Cancelling the password keeps the screen part on and says the lid will still sleep. The lid state is read back from `pmset -g`, so one left on by a crash shows as on.
+- [x] A ⚡ next to the menu bar icon while it's on. The accessibility text says so.
+- [x] `--selftest` covers on, off, a cancelled password and Quit against a fake `PowerControl`. `--render --agent-on` shows the switch.
+- [ ] Checked by hand: toggle on, close the lid during a long job, then reopen it. Toggle off and check `pmset -g`.
+
+---
+
 ## Deferred to v2 (PRD §10)
 
 Not broken into stories yet: capture from claude.ai web/mobile, a morning digest, more pets and skins, and natural-language due dates in quick-add.

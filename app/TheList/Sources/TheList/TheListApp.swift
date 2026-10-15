@@ -25,6 +25,11 @@ struct TheListApp: App {
         store.start()
         return store
     }()
+    @State private var agent: AgentMode = {
+        let agent = AgentMode()
+        agent.refresh()
+        return agent
+    }()
 
     var body: some Scene {
         MenuBarExtra {
@@ -38,15 +43,22 @@ struct TheListApp: App {
                 addGroup: store.addGroup,
                 exportReminders: store.exportReminders,
                 exporting: store.exporting,
-                quit: { NSApplication.shared.terminate(nil) },
+                agentOn: agent.isOn,
+                agentLid: agent.lidAwake,
+                agentBusy: agent.busy,
+                setAgent: agent.setOn,
+                quit: {
+                    agent.shutdown()
+                    NSApplication.shared.terminate(nil)
+                },
                 openURL: store.openURL,
                 reveal: store.reveal,
                 todoPath: store.todoPath,
-                message: store.message,
-                messageIsError: store.messageIsError
+                message: agent.message ?? store.message,
+                messageIsError: agent.message != nil || store.messageIsError
             ))
         } label: {
-            Image(nsImage: MenuBarIcon.image(for: store.snapshot.badge))
+            Image(nsImage: MenuBarIcon.image(for: store.snapshot.badge, agentMode: agent.isOn))
         }
         .menuBarExtraStyle(.window)
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds The List and wraps it into build/The List.app, signed for this Mac only.
+# Builds The Companion and wraps it into build/The Companion.app, signed for this Mac only.
 # Usage: ./build-app.sh [release|debug]   (default: release)
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -8,8 +8,8 @@ config="${1:-release}"
 swift build -c "$config" --product TheList
 bin="$(swift build -c "$config" --show-bin-path)/TheList"
 
-app="build/The List.app"
-rm -rf "$app"
+app="build/The Companion.app"
+rm -rf "$app" "build/The List.app" # the old name, before E9
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/TheList"
 

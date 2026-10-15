@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import TheListCore
 
-/// `TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark] [--show-done] [--detail "task title"] [--group id]`
+/// `TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark] [--show-done] [--detail "task title"] [--group id] [--agent-on]`
 /// Draws the popover and the menu bar icon for a TODO.md into PNGs without launching the app,
 /// so layout can be checked from the command line.
 enum Render {
@@ -18,6 +18,7 @@ enum Render {
         let todoPath = value("--todo") ?? ListStore.defaultTodoPath()
         let today = value("--today") ?? TheListCore.today()
         let dark = args.contains("--dark")
+        let agentOn = args.contains("--agent-on")
 
         let bytes = (try? Data(contentsOf: URL(fileURLWithPath: todoPath))).map { [UInt8]($0) } ?? []
         let groups = readSettings(path: settingsPath(forTodoPath: todoPath)).groups
@@ -28,7 +29,7 @@ enum Render {
             (snapshot.groups.flatMap(\.items) + snapshot.done).first { $0.title == title }.map(PopoverView.key)
         }
         let popover = PopoverView(
-            snapshot: snapshot, today: today, actions: PopoverActions(todoPath: todoPath), scrollable: false,
+            snapshot: snapshot, today: today, actions: PopoverActions(agentOn: agentOn, agentLid: agentOn, todoPath: todoPath), scrollable: false,
             showDone: args.contains("--show-done"), selected: detail
         )
             .background(dark ? Color(white: 0.16) : Color(white: 0.97))
@@ -37,7 +38,7 @@ enum Render {
         renderer.scale = 2
         guard let image = renderer.nsImage, write(image, to: out) else { return 1 }
 
-        let icon = MenuBarIcon.image(for: snapshot.badge)
+        let icon = MenuBarIcon.image(for: snapshot.badge, agentMode: agentOn)
         let iconOut = (out as NSString).deletingPathExtension + "-icon.png"
         _ = write(icon, to: iconOut, background: dark ? .black : .white)
         print("wrote \(out) and \(iconOut) (badge: \(snapshot.badge.count), alert: \(snapshot.badge.alert))")

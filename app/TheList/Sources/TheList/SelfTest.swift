@@ -116,8 +116,49 @@ enum SelfTest {
             store.snapshot.filter == .all && store.snapshot.taskGroups.isEmpty && item("Review the PR") != nil
         }
 
+        // E9: agent mode, against a fake so nothing touches power settings or asks for a password.
+        let power = FakePower()
+        let agent = AgentMode(power: power)
+        agent.setOn(true)
+        await expect("agent mode on: screen assertion held, lid awake, shows as on") {
+            !agent.busy && agent.isOn && agent.lidAwake && power.holding && power.lid
+        }
+        agent.setOn(false)
+        await expect("agent mode off: assertion released, lid sleeps again") {
+            !agent.busy && !agent.isOn && !power.holding && !power.lid
+        }
+        power.refuseLid = true
+        agent.setOn(true)
+        await expect("password cancelled: still on for the screen, says the lid will sleep") {
+            !agent.busy && agent.isOn && !agent.lidAwake && agent.message != nil
+        }
+        agent.shutdown()
+        await expect("quit: assertion released") { !agent.isOn && !power.holding }
+        let off = MenuBarIcon.image(for: Badge(count: 2, alert: false))
+        let on = MenuBarIcon.image(for: Badge(count: 2, alert: false), agentMode: true)
+        await expect("menu bar icon: wider with the bolt, says agent mode") {
+            on.size.width > off.size.width && (on.accessibilityDescription ?? "").contains("agent mode on")
+        }
+
         try? FileManager.default.removeItem(at: dir)
         print(failures == 0 ? "all passed" : "\(failures) failed")
         return failures == 0 ? 0 : 1
+    }
+}
+
+/// Stands in for `SystemPower` in the self-test.
+private final class FakePower: PowerControl, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _lid = false
+    var holding = false
+    var refuseLid = false
+    var lid: Bool { lock.withLock { _lid } }
+
+    @MainActor func holdAwake() -> Bool { holding = true; return true }
+    @MainActor func releaseAwake() { holding = false }
+    func lidAwake() -> Bool { lid }
+    func setLidAwake(_ on: Bool) throws {
+        if lock.withLock({ refuseLid }) { throw PowerError(description: "User canceled. (-128)") }
+        lock.withLock { _lid = on }
     }
 }

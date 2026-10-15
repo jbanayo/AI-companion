@@ -5,9 +5,9 @@
 	<key>CFBundleIdentifier</key>
 	<string>com.jbanayo.thelist</string>
 	<key>CFBundleName</key>
-	<string>The List</string>
+	<string>The Companion</string>
 	<key>CFBundleDisplayName</key>
-	<string>The List</string>
+	<string>The Companion</string>
 	<key>CFBundleExecutable</key>
 	<string>TheList</string>
 	<key>CFBundleIconFile</key>
@@ -25,9 +25,9 @@
 	<true/>
 	<!-- E8.4: Export to Reminders. macOS 14+ asks with the first key; older keys kept for completeness. -->
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>The List copies your open tasks into Reminders, one list per group, when you choose Export to Reminders.</string>
+	<string>The Companion copies your open tasks into Reminders, one list per group, when you choose Export to Reminders.</string>
 	<key>NSRemindersUsageDescription</key>
-	<string>The List copies your open tasks into Reminders, one list per group, when you choose Export to Reminders.</string>
+	<string>The Companion copies your open tasks into Reminders, one list per group, when you choose Export to Reminders.</string>
 	<!-- Where TODO.md lives until Settings (E7.1) can change it. Filled in by build-app.sh. -->
 	<key>TheListTodoPath</key>
 	<string>__TODO_PATH__</string>

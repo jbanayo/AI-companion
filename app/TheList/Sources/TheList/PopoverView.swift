@@ -14,6 +14,11 @@ struct PopoverActions {
     /// E8.4
     var exportReminders: @MainActor () -> Void = {}
     var exporting = false
+    /// E9: keep the Mac awake for Claude Code and Codex. `agentLid` is the lid-closed part.
+    var agentOn = false
+    var agentLid = false
+    var agentBusy = false
+    var setAgent: @MainActor (Bool) -> Void = { _ in }
     var quit: @MainActor () -> Void = {}
     var openURL: @MainActor (URL) -> Void = { _ in }
     var reveal: @MainActor (String) -> Void = { _ in }
@@ -57,6 +62,8 @@ struct PopoverView: View {
                 Divider()
                 fitting { list }
             }
+            Divider()
+            agentRow
             Divider()
             footer
         }
@@ -215,6 +222,37 @@ struct PopoverView: View {
                 }
             }
         }
+    }
+
+    /// E9: one switch for keeping agents running. Shown under the list and the details alike.
+    private var agentRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bolt.fill")
+                .foregroundStyle(actions.agentOn ? AnyShapeStyle(.yellow) : AnyShapeStyle(.secondary))
+                .frame(width: 14)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Agent mode")
+                Text(agentSubtitle).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if actions.agentBusy {
+                ProgressView().controlSize(.small)
+            } else {
+                Toggle("Agent mode", isOn: Binding(get: { actions.agentOn }, set: { actions.setAgent($0) }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .help("Keeps the Mac awake so Claude Code and Codex keep working. Turning it on asks for your password to stay awake with the lid closed. With the lid closed the Mac can get hot, so don't put it in a bag.")
+    }
+
+    private var agentSubtitle: String {
+        if actions.agentBusy { return "Waiting for your password…" }
+        if !actions.agentOn { return "Mac sleeps as usual" }
+        return actions.agentLid ? "Awake, even with the lid closed" : "Awake while the screen is off"
     }
 
     private var footer: some View {

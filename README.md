@@ -1,6 +1,6 @@
 # AI Companion
 
-Personal project. Home of **The List**: a macOS menu bar todo list that Claude fills in, with a draggable pixel dog.
+Personal project. Home of **The Companion** (formerly The List): a macOS menu bar app with a todo list that Claude fills in, an agent mode that keeps Claude Code and Codex running, and a draggable pixel dog. The todo view inside it is still called The List.
 
 - What and why: [PRD - The List.md](PRD%20-%20The%20List.md)
 - Build plan, story by story: [EPICS - The List.md](EPICS%20-%20The%20List.md)
@@ -53,15 +53,26 @@ The MCP server runs over stdio from `mcp/dist/index.js` (`npm run build` in `mcp
 
 ```bash
 cd app/TheList
-./build-app.sh                  # builds build/The List.app (release) with its icon, signed for this Mac only
-open "build/The List.app"       # starts it in the menu bar; Quit is in the popover footer
+./build-app.sh                  # builds build/The Companion.app (release) with its icon, signed for this Mac only
+open "build/The Companion.app"  # starts it in the menu bar; Quit is in the popover footer
 ```
 
-The app reads `data/TODO.md` (the path is baked into the bundle at build time). To point it somewhere else, launch it with `open --env THE_LIST_TODO_PATH=/path/to/TODO.md "build/The List.app"`. To see the popover without clicking, `$(swift build --show-bin-path)/TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark]` draws it to a PNG (add `--show-done` to open the Done section, `--group <id>` to show one group). `$(swift build --show-bin-path)/TheList --selftest` runs the popover's actions (tick, untick, move, quick-add, an outside edit) through the real store against a scratch list. The app logs each reload under the subsystem `com.jbanayo.thelist`.
+The app reads `data/TODO.md` (the path is baked into the bundle at build time). To point it somewhere else, launch it with `open --env THE_LIST_TODO_PATH=/path/to/TODO.md "build/The Companion.app"`. To see the popover without clicking, `$(swift build --show-bin-path)/TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark]` draws it to a PNG (add `--show-done` to open the Done section, `--group <id>` to show one group, `--agent-on` to show agent mode switched on). `$(swift build --show-bin-path)/TheList --selftest` runs the popover's actions (tick, untick, move, quick-add, an outside edit) through the real store against a scratch list, and agent mode against a fake that never touches power settings. The app logs each reload under the subsystem `com.jbanayo.thelist`.
 
 The logo (the "Stack" design, chosen 2026-10-04) is drawn in code in `Logo.swift`, which draws both the menu bar glyph and the app icon. `build-app.sh` runs `TheList --make-iconset` and `iconutil` to make `AppIcon.icns`.
 
-**Export to Reminders** asks for Reminders access the first time. It only works from the bundled app, because macOS needs the usage text in `Info.plist`. The app is signed ad hoc, so macOS may ask again after a rebuild. If it says access is denied, turn The List back on in System Settings → Privacy & Security → Reminders.
+**Export to Reminders** asks for Reminders access the first time. It only works from the bundled app, because macOS needs the usage text in `Info.plist`. The app is signed ad hoc, so macOS may ask again after a rebuild. If it says access is denied, turn The Companion back on in System Settings → Privacy & Security → Reminders.
+
+**Agent mode** is the switch above the footer. It keeps the Mac awake so Claude Code and Codex keep working:
+
+- With the screen off, it holds a power assertion, the same as `caffeinate -i`. This needs no password. The screen can still dim and lock.
+- With the lid closed, it runs `pmset -a disablesleep 1`, which asks for your Mac password. If you cancel, agent mode stays on for the screen only, and the footer says so.
+- Turning it off, or quitting, runs `pmset -a disablesleep 0`, which asks for the password again.
+- It isn't remembered across launches. If a crash leaves the lid setting on, the switch shows on at the next launch, so you can turn it off. You can also check by hand with `pmset -g | grep SleepDisabled`.
+- A closed MacBook that stays awake can get hot. Don't put it in a bag with agent mode on.
+- While it's on, a ⚡ shows next to the menu bar icon.
+
+The rename to The Companion changed only the app's display name. The bundle id (`com.jbanayo.thelist`), the MCP server name (`the-list`) and the Reminders list names ("The List · …") are unchanged, so existing permissions, Claude and Codex configs, and exported lists keep working.
 
 ### Running the checks
 
