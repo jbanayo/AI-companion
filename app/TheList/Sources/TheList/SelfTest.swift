@@ -136,8 +136,13 @@ enum SelfTest {
         await expect("quit: assertion released") { !agent.isOn && !power.holding }
         let off = MenuBarIcon.image(for: Badge(count: 2, alert: false))
         let on = MenuBarIcon.image(for: Badge(count: 2, alert: false), agentMode: true)
-        await expect("menu bar icon: wider with the bolt, says agent mode") {
-            on.size.width > off.size.width && (on.accessibilityDescription ?? "").contains("agent mode on")
+        let due = MenuBarIcon.image(for: Badge(count: 2, alert: true))
+        await expect("menu bar icon: Super Saiyan hair is narrower, says agent mode") {
+            on.size.width < off.size.width && (on.accessibilityDescription ?? "").contains("agent mode on")
+        }
+        await expect("menu bar icon: due today adds the dot and drops the template") {
+            due.size.width > off.size.width && off.isTemplate && !due.isTemplate
+                && (due.accessibilityDescription ?? "").contains("due today")
         }
 
         try? FileManager.default.removeItem(at: dir)

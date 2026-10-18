@@ -325,9 +325,11 @@ check("groups, effective priority, sort order, badge") {
     return s.badge == Badge(count: 4, alert: true) ? nil : "badge: \(s.badge)"
 }
 
-check("due today counts toward the badge but isn't overdue; empty list is empty") {
+check("due today counts toward the badge and sets the alert; due tomorrow doesn't; empty list is empty") {
     let s = makeSnapshot(doc("# Todo\n\n## P2 — Soon\n- [ ] x {id:t_1 due:2026-09-28}\n"), today: monday)
-    if s.badge != Badge(count: 1, alert: false) { return "badge: \(s.badge)" }
+    if s.badge != Badge(count: 1, alert: true) { return "badge: \(s.badge)" }
+    let t = makeSnapshot(doc("# Todo\n\n## P1 — This week\n- [ ] x {id:t_1 due:2026-09-29}\n"), today: monday)
+    if t.badge != Badge(count: 1, alert: false) { return "tomorrow badge: \(t.badge)" }
     let e = makeSnapshot(doc(""), today: monday)
     return e.isEmpty && e.badge == Badge(count: 0, alert: false) && e.groups.count == 4 ? nil : "empty: \(e)"
 }

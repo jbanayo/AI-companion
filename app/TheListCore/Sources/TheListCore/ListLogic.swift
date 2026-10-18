@@ -42,6 +42,11 @@ public func isOverdue(_ item: ItemView, today: String) -> Bool {
     return due < today
 }
 
+public func isDueByToday(_ item: ItemView, today: String) -> Bool {
+    guard !item.done, let due = item.meta["due"], isValidDate(due) else { return false }
+    return due <= today
+}
+
 /// Display priority, then due date (soonest first, undated last), then title.
 public func sortByDisplayPriority(_ items: [ItemView], today: String) -> [ItemView] {
     func dueKey(_ i: ItemView) -> String {
@@ -76,7 +81,7 @@ public struct ListGroup: Equatable, Sendable, Identifiable {
 public struct Badge: Equatable, Sendable {
     /// Open items showing as P0 or P1.
     public let count: Int
-    /// True when anything open is overdue: the menu bar count turns red.
+    /// True when anything open is due today or overdue: the menu bar icon shows a coral dot.
     public let alert: Bool
 
     public init(count: Int, alert: Bool) {
@@ -175,7 +180,7 @@ public func makeSnapshot(_ doc: Document, today: String, groups taskGroups: [Tas
     return ListSnapshot(
         groups: groups,
         done: items.filter { $0.done && matches($0) },
-        badge: Badge(count: urgent, alert: open.contains { isOverdue($0, today: today) }),
+        badge: Badge(count: urgent, alert: open.contains { isDueByToday($0, today: today) }),
         taskGroups: taskGroups,
         filter: filter,
         openCounts: openCounts

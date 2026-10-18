@@ -40,7 +40,11 @@ enum Render {
 
         let icon = MenuBarIcon.image(for: snapshot.badge, agentMode: agentOn)
         let iconOut = (out as NSString).deletingPathExtension + "-icon.png"
-        _ = write(icon, to: iconOut, background: dark ? .black : .white)
+        // The icon's non-template states resolve the label color when drawn, so draw it in the
+        // appearance asked for rather than this Mac's.
+        NSAppearance(named: dark ? .darkAqua : .aqua)?.performAsCurrentDrawingAppearance {
+            _ = write(icon, to: iconOut, background: dark ? .black : .white)
+        }
         print("wrote \(out) and \(iconOut) (badge: \(snapshot.badge.count), alert: \(snapshot.badge.alert))")
         return 0
     }
