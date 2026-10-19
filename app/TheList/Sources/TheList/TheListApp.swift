@@ -25,6 +25,11 @@ struct TheListApp: App {
         store.start()
         return store
     }()
+    @State private var activity: AgentActivity = {
+        let activity = AgentActivity(dir: agentsDir(forTodoPath: ListStore.defaultTodoPath()))
+        activity.start()
+        return activity
+    }()
     @State private var agent: AgentMode = {
         let agent = AgentMode()
         agent.refresh()
@@ -47,6 +52,8 @@ struct TheListApp: App {
                 agentLid: agent.lidAwake,
                 agentBusy: agent.busy,
                 setAgent: agent.setOn,
+                waits: activity.waits,
+                dismissWait: activity.dismiss,
                 quit: {
                     agent.shutdown()
                     NSApplication.shared.terminate(nil)
@@ -58,7 +65,9 @@ struct TheListApp: App {
                 messageIsError: agent.message != nil || store.messageIsError
             ))
         } label: {
-            Image(nsImage: MenuBarIcon.image(for: store.snapshot.badge, agentMode: agent.isOn))
+            Image(nsImage: MenuBarIcon.image(
+                for: store.snapshot.badge, agentMode: agent.isOn, waiting: !activity.waits.isEmpty
+            ))
         }
         .menuBarExtraStyle(.window)
     }

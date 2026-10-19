@@ -74,3 +74,52 @@ public final class TodoFileWatcher: @unchecked Sendable {
         onChange(bytes)
     }
 }
+
+/// E10.1: calls `onChange` (on a background queue) whenever anything in a folder changes. The
+/// folder must exist. Same FSEvents setup as `TodoFileWatcher`, without the byte comparison.
+public final class DirectoryWatcher: @unchecked Sendable {
+    private let path: String
+    private let onChange: @Sendable () -> Void
+    private let queue = DispatchQueue(label: "TheListCore.DirectoryWatcher")
+    // Touched only on `queue`.
+    private var stream: FSEventStreamRef?
+
+    public init(path: String, onChange: @escaping @Sendable () -> Void) {
+        self.path = path
+        self.onChange = onChange
+    }
+
+    public func start() {
+        queue.sync {
+            guard stream == nil else { return }
+            var context = FSEventStreamContext(
+                version: 0,
+                info: Unmanaged.passRetained(self).toOpaque(),
+                retain: nil,
+                release: { info in Unmanaged<DirectoryWatcher>.fromOpaque(info!).release() },
+                copyDescription: nil
+            )
+            let callback: FSEventStreamCallback = { _, info, _, _, _, _ in
+                Unmanaged<DirectoryWatcher>.fromOpaque(info!).takeUnretainedValue().onChange()
+            }
+            guard let s = FSEventStreamCreate(
+                kCFAllocatorDefault, callback, &context, [path] as CFArray,
+                FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.1,
+                FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer)
+            ) else { return }
+            FSEventStreamSetDispatchQueue(s, queue)
+            FSEventStreamStart(s)
+            stream = s
+        }
+    }
+
+    public func stop() {
+        queue.sync {
+            guard let s = stream else { return }
+            FSEventStreamStop(s)
+            FSEventStreamInvalidate(s)
+            FSEventStreamRelease(s) // releases the context, and with it this watcher
+            stream = nil
+        }
+    }
+}

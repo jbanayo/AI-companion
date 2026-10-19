@@ -350,6 +350,19 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 - [x] `--selftest` covers on, off, a cancelled password and Quit against a fake `PowerControl`. `--render --agent-on` shows the switch.
 - [ ] Checked by hand: toggle on, close the lid during a long job, then reopen it. Toggle off and check `pmset -g`.
 
+
+## E10 — Waiting on you
+
+*Added 2026-10-19.*
+
+### E10.1 Yellow dot when an agent needs me · M · **Opus**
+*As me, I want to see at a glance when Claude Code or Codex is waiting on me, so a long job doesn't sit blocked while I think it's working.*
+- [x] `hooks/agent-status.sh`, run from Claude Code and Codex hooks, writes one file per waiting session to `data/agents/` and deletes it when work resumes. It always exits 0 and prints nothing.
+- [x] A yellow dot (amber `#F5B800`) on the menu bar icon, next to the coral due-today dot. The accessibility text says so.
+- [x] "Waiting on you" in the popover, above agent mode: agent, project, why, how long, and × to dismiss. Blocked sessions come first.
+- [x] Files older than 12 h are ignored. `fixture-check` covers reading the files and the script; `--selftest` covers the icon; `--render --waiting` draws both.
+- [ ] Checked by hand: a Claude Code permission prompt shows the dot, and approving it clears it.
+- [ ] Checked by hand: Codex hooks trusted with `/hooks`, then an approval and a finished turn both show. Also check whether the ChatGPT Codex app runs hooks or only the CLI does.
 ---
 
 ## Deferred to v2 (PRD §10)

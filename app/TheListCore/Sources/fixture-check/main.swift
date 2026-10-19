@@ -815,5 +815,62 @@ check("reminderDraft maps priority, due, link, notes and list") {
     return nil
 }
 
+print("Agents waiting on me (E10.1):")
+
+func scratchDir(_ name: String) -> String {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("thelist-\(name)-\(UUID().uuidString)").path
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    return dir
+}
+
+check("loadAgentWaits: blocked first then oldest; malformed, stale and temp files skipped") {
+    let dir = scratchDir("waits")
+    defer { try? FileManager.default.removeItem(atPath: dir) }
+    let now = ISO8601DateFormatter().date(from: "2026-10-19T12:00:00Z")!
+    func put(_ name: String, _ body: String) { FileManager.default.createFile(atPath: "\(dir)/\(name)", contents: Data(body.utf8)) }
+    put("claude-a.json", #"{"agent":"claude","session":"a","state":"finished","reason":"","cwd":"/x/Old","at":"2026-10-19T11:00:00Z"}"#)
+    put("codex-b.json", #"{"agent":"codex","session":"b","state":"waiting","reason":"needs permission","cwd":"/x/AI Companion","at":"2026-10-19T11:50:00Z"}"#)
+    put("claude-c.json", #"{"agent":"claude","session":"c","state":"finished","cwd":"","at":"2026-10-19T11:30:00Z"}"#)
+    put("claude-stale.json", #"{"agent":"claude","session":"s","state":"waiting","at":"2026-10-18T23:00:00Z"}"#)
+    put("claude-bad.json", "{not json")
+    put("claude-odd.json", #"{"agent":"claude","session":"o","state":"thinking","at":"2026-10-19T11:59:00Z"}"#)
+    put(".tmp.abc", #"{"agent":"claude","session":"t","state":"waiting","at":"2026-10-19T11:59:00Z"}"#)
+    let w = loadAgentWaits(dir: dir, now: now)
+    if w.map(\.session) != ["b", "a", "c"] { return "order: \(w.map(\.session))" }
+    if w[0].agentName != "Codex" || w[0].project != "AI Companion" || w[0].reason != "needs permission" { return "first: \(w[0])" }
+    if w[2].project != "" || waitedFor(w[1].since, now: now) != "1h" || waitedFor(w[0].since, now: now) != "10m" { return "labels" }
+    return loadAgentWaits(dir: dir + "/missing").isEmpty ? nil : "missing folder should be empty"
+}
+
+check("hooks/agent-status.sh writes a waiting session and deletes it when work resumes") {
+    let data = scratchDir("hook")
+    defer { try? FileManager.default.removeItem(atPath: data) }
+    func run(_ args: [String], _ stdin: String) throws {
+        let p = Process()
+        p.executableURL = projectDir.appendingPathComponent("hooks/agent-status.sh")
+        p.arguments = args
+        p.environment = ["THE_LIST_DATA_DIR": data, "PATH": "/usr/bin:/bin"]
+        let pipe = Pipe()
+        p.standardInput = pipe
+        try p.run()
+        pipe.fileHandleForWriting.write(Data(stdin.utf8))
+        try pipe.fileHandleForWriting.close()
+        p.waitUntilExit()
+        if p.terminationStatus != 0 { throw NSError(domain: "hook exited \(p.terminationStatus)", code: 1) }
+    }
+    let event = #"{"session_id":"s-1","cwd":"/x/proj","hook_event_name":"PermissionRequest"}"#
+    try run(["claude", "waiting", "needs permission"], event)
+    var w = loadAgentWaits(dir: data + "/agents")
+    if w.count != 1 || w[0].session != "s-1" || w[0].state != .waiting || w[0].project != "proj" { return "after waiting: \(w)" }
+    try run(["claude", "finished"], event)
+    w = loadAgentWaits(dir: data + "/agents")
+    if w.count != 1 || w[0].state != .finished { return "after finished: \(w)" }
+    try run(["claude", "working"], event)
+    if !loadAgentWaits(dir: data + "/agents").isEmpty { return "working should delete it" }
+    try run(["codex", "waiting"], "not json")
+    try run(["someone", "waiting"], event)
+    return loadAgentWaits(dir: data + "/agents").isEmpty ? nil : "bad input or agent wrote a file"
+}
+
 print("\n\(passed) passed, \(failed) failed")
 exit(failed == 0 ? 0 : 1)

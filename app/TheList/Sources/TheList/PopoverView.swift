@@ -19,6 +19,9 @@ struct PopoverActions {
     var agentLid = false
     var agentBusy = false
     var setAgent: @MainActor (Bool) -> Void = { _ in }
+    /// E10.1: Claude Code and Codex sessions waiting on me.
+    var waits: [AgentWait] = []
+    var dismissWait: @MainActor (AgentWait) -> Void = { _ in }
     var quit: @MainActor () -> Void = {}
     var openURL: @MainActor (URL) -> Void = { _ in }
     var reveal: @MainActor (String) -> Void = { _ in }
@@ -63,6 +66,10 @@ struct PopoverView: View {
                 fitting { list }
             }
             Divider()
+            if !actions.waits.isEmpty {
+                waitingSection
+                Divider()
+            }
             agentRow
             Divider()
             footer
@@ -247,6 +254,41 @@ struct PopoverView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
         .help("Keeps the Mac awake so Claude Code and Codex keep working. Turning it on asks for your password to stay awake with the lid closed. With the lid closed the Mac can get hot, so don't put it in a bag.")
+    }
+
+    /// E10.1: what's waiting on me, blocked sessions first. Shown under the list and the details.
+    private var waitingSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Waiting on you").font(.caption).foregroundStyle(.secondary)
+            ForEach(actions.waits, id: \.path) { wait in
+                HStack(spacing: 8) {
+                    Circle().fill(MenuBarIcon.waitingColor).frame(width: 7, height: 7).frame(width: 14)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(wait.project.isEmpty ? wait.agentName : "\(wait.agentName) · \(wait.project)")
+                            .lineLimit(1)
+                        Text("\(waitReason(wait)) · \(waitedFor(wait.since))")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "xmark")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .contentShape(Rectangle())
+                        .onTapGesture { actions.dismissWait(wait) }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityLabel("Dismiss")
+                        .help("Dismiss. It comes back the next time this session needs you.")
+                }
+                .help(wait.cwd)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+    }
+
+    private func waitReason(_ wait: AgentWait) -> String {
+        if wait.state == .finished { return "finished, your turn" }
+        return wait.reason.isEmpty ? "needs your input" : wait.reason
     }
 
     private var agentSubtitle: String {

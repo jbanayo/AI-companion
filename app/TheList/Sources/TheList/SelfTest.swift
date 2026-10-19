@@ -144,6 +144,12 @@ enum SelfTest {
             due.size.width > off.size.width && off.isTemplate && !due.isTemplate
                 && (due.accessibilityDescription ?? "").contains("due today")
         }
+        let waiting = MenuBarIcon.image(for: Badge(count: 2, alert: false), waiting: true)
+        let both = MenuBarIcon.image(for: Badge(count: 2, alert: true), waiting: true)
+        await expect("menu bar icon: waiting adds the yellow dot; both dots fit side by side") {
+            !waiting.isTemplate && waiting.size.width == due.size.width && both.size.width > due.size.width
+                && (waiting.accessibilityDescription ?? "").contains("waiting on you")
+        }
 
         try? FileManager.default.removeItem(at: dir)
         print(failures == 0 ? "all passed" : "\(failures) failed")

@@ -49,6 +49,23 @@ The MCP server runs over stdio from `mcp/dist/index.js` (`npm run build` in `mcp
   ```
   Restart Codex after editing.
 
+### "Waiting on you" dot
+
+A yellow dot on the menu bar icon means a Claude Code or Codex session is waiting on me. Either it's stuck on a permission prompt or a question, or it finished its turn and wants my next message. The popover lists each one ("Claude · AI Companion, needs permission · 4m"), and × dismisses a stale one. The dot clears when I reply.
+
+Hooks in both tools run `hooks/agent-status.sh <claude|codex> <state>`. The script writes one file per waiting session to `data/agents/` and deletes it when work resumes, and the app watches that folder. Files older than 12 hours are ignored, which covers sessions killed without saying so.
+
+- **Claude Code:** the `hooks` block in `~/.claude/settings.json`.
+  - Waiting: `PermissionRequest`, `Notification` (permission and input prompts), `PreToolUse` on `AskUserQuestion`.
+  - Finished: `Stop`.
+  - Working: `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `PermissionDenied`.
+  - Ended: `SessionEnd`.
+- **Codex:** `~/.codex/hooks.json`.
+  - Waiting: `PermissionRequest`. Finished: `Stop`.
+  - Working: `UserPromptSubmit`, `PostToolUse`, `Interrupt`. Ended: `SessionEnd`.
+  - Codex runs a new hook only after it has been trusted. Open the Codex CLI once (`/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex`), type `/hooks`, and trust them.
+  - Codex's `notify` setting is left alone. It only reports finished turns, and Computer Use already uses it.
+
 ### Building and running the app
 
 ```bash

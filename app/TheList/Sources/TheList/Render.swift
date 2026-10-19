@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import TheListCore
 
-/// `TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark] [--show-done] [--detail "task title"] [--group id] [--agent-on]`
+/// `TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark] [--show-done] [--detail "task title"] [--group id] [--agent-on] [--waiting]`
 /// Draws the popover and the menu bar icon for a TODO.md into PNGs without launching the app,
 /// so layout can be checked from the command line.
 enum Render {
@@ -19,6 +19,11 @@ enum Render {
         let today = value("--today") ?? TheListCore.today()
         let dark = args.contains("--dark")
         let agentOn = args.contains("--agent-on")
+        // A sample session waiting on me, for the dot and the popover's list (E10.1).
+        let waits = args.contains("--waiting") ? [AgentWait(
+            agent: "claude", session: "sample", state: .waiting, reason: "needs permission",
+            cwd: "/Users/me/AI Companion", since: Date().addingTimeInterval(-240), path: "/dev/null"
+        )] : []
 
         let bytes = (try? Data(contentsOf: URL(fileURLWithPath: todoPath))).map { [UInt8]($0) } ?? []
         let groups = readSettings(path: settingsPath(forTodoPath: todoPath)).groups
@@ -29,7 +34,7 @@ enum Render {
             (snapshot.groups.flatMap(\.items) + snapshot.done).first { $0.title == title }.map(PopoverView.key)
         }
         let popover = PopoverView(
-            snapshot: snapshot, today: today, actions: PopoverActions(agentOn: agentOn, agentLid: agentOn, todoPath: todoPath), scrollable: false,
+            snapshot: snapshot, today: today, actions: PopoverActions(agentOn: agentOn, agentLid: agentOn, waits: waits, todoPath: todoPath), scrollable: false,
             showDone: args.contains("--show-done"), selected: detail
         )
             .background(dark ? Color(white: 0.16) : Color(white: 0.97))
@@ -38,7 +43,7 @@ enum Render {
         renderer.scale = 2
         guard let image = renderer.nsImage, write(image, to: out) else { return 1 }
 
-        let icon = MenuBarIcon.image(for: snapshot.badge, agentMode: agentOn)
+        let icon = MenuBarIcon.image(for: snapshot.badge, agentMode: agentOn, waiting: !waits.isEmpty)
         let iconOut = (out as NSString).deletingPathExtension + "-icon.png"
         // The icon's non-template states resolve the label color when drawn, so draw it in the
         // appearance asked for rather than this Mac's.
