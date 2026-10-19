@@ -160,6 +160,8 @@ The app re-sorts automatically when a due date passes: an overdue P1 is shown as
 
 ### 6.6 Pixel pet (optional)
 
+> **Dropped 2026-10-19.** Replaced by a stickman each for Claude and Codex at the bottom of the popover (EPICS E11), which only draws while the popover is open.
+
 First pet: **a dog** (tan fur, floppy dark ear, wagging tail). More pets can come later (§10).
 
 | # | Requirement |

@@ -2,33 +2,45 @@ import Foundation
 import Observation
 import TheListCore
 
-/// E10.1: Claude Code and Codex sessions waiting on me, from the files hooks/agent-status.sh
-/// writes into data/agents/. Drives the yellow dot and the popover's "Waiting on you" list.
+/// E10.1, E11: what Claude Code and Codex are doing, from the files hooks/agent-status.sh writes
+/// into `agentsDir()`, plus Codex's usage limit from its session logs. Drives the yellow dot, the
+/// popover's "Waiting on you" list and the two stickmen.
 @MainActor
 @Observable
 final class AgentActivity {
     private(set) var waits: [AgentWait] = []
+    private(set) var claude: AgentPose = .sitting
+    private(set) var codex: AgentPose = .sitting
 
     @ObservationIgnored let dir: String
+    @ObservationIgnored private let codexSessions: String
+    @ObservationIgnored private var sessions: [AgentWait] = []
+    @ObservationIgnored private var codexLimit: AgentLimit?
     @ObservationIgnored private var watcher: DirectoryWatcher?
     @ObservationIgnored private var timer: Timer?
 
-    init(dir: String) {
+    init(dir: String, codexSessions: String = NSHomeDirectory() + "/.codex/sessions") {
         self.dir = dir
+        self.codexSessions = codexSessions
     }
 
     func start() {
         guard watcher == nil else { return }
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        readCodexLimit()
         reload()
         let watcher = DirectoryWatcher(path: dir) { [weak self] in
             Task { @MainActor in self?.reload() }
         }
         watcher.start()
         self.watcher = watcher
-        // Ages the "4m" labels and drops files from sessions that died without saying so.
+        // Once a minute: ages the "4m" labels, lets stale sessions go, and re-reads the end of
+        // Codex's newest log (64 KB at most) for its usage limit.
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.reload() }
+            Task { @MainActor in
+                self?.readCodexLimit()
+                self?.reload()
+            }
         }
     }
 
@@ -39,7 +51,21 @@ final class AgentActivity {
     }
 
     private func reload() {
-        let next = loadAgentWaits(dir: dir)
-        if next != waits { waits = next }
+        let now = Date()
+        sessions = loadAgentSessions(dir: dir, now: now)
+        set(\.waits, agentWaits(sessions))
+        set(\.claude, agentPose(agent: "claude", sessions: sessions, now: now))
+        set(\.codex, agentPose(agent: "codex", sessions: sessions, limit: codexLimit, now: now))
+    }
+
+    private func readCodexLimit() {
+        codexLimit = newestCodexLog(sessionsDir: codexSessions)
+            .flatMap { readTail(path: $0) }
+            .flatMap { TheListCore.codexLimit(fromLogTail: $0) }
+    }
+
+    /// Assigns only on a real change, so the popover doesn't redraw every minute for nothing.
+    private func set<T: Equatable>(_ key: ReferenceWritableKeyPath<AgentActivity, T>, _ value: T) {
+        if self[keyPath: key] != value { self[keyPath: key] = value }
     }
 }

@@ -14,7 +14,8 @@ struct PopoverActions {
     /// E8.4
     var exportReminders: @MainActor () -> Void = {}
     var exporting = false
-    /// E9: keep the Mac awake for Claude Code and Codex. `agentLid` is the lid-closed part.
+    /// E9, E11: Saiyan mode keeps the Mac awake for Claude Code and Codex. `agentLid` is the
+    /// lid-closed part.
     var agentOn = false
     var agentLid = false
     var agentBusy = false
@@ -22,6 +23,10 @@ struct PopoverActions {
     /// E10.1: Claude Code and Codex sessions waiting on me.
     var waits: [AgentWait] = []
     var dismissWait: @MainActor (AgentWait) -> Void = { _ in }
+    /// E11: the stickmen. `sceneLive` is off for `--render`, which draws one frame.
+    var claude: AgentPose = .sitting
+    var codex: AgentPose = .sitting
+    var sceneLive = true
     var quit: @MainActor () -> Void = {}
     var openURL: @MainActor (URL) -> Void = { _ in }
     var reveal: @MainActor (String) -> Void = { _ in }
@@ -70,6 +75,8 @@ struct PopoverView: View {
                 waitingSection
                 Divider()
             }
+            AgentScene(claude: actions.claude, codex: actions.codex, saiyan: actions.agentOn, live: actions.sceneLive)
+            Divider()
             agentRow
             Divider()
             footer
@@ -231,21 +238,22 @@ struct PopoverView: View {
         }
     }
 
-    /// E9: one switch for keeping agents running. Shown under the list and the details alike.
+    /// E9, E11: Saiyan mode, one switch for keeping agents running. Shown under the list and the
+    /// details alike.
     private var agentRow: some View {
         HStack(spacing: 8) {
             Image(systemName: "bolt.fill")
                 .foregroundStyle(actions.agentOn ? AnyShapeStyle(.yellow) : AnyShapeStyle(.secondary))
                 .frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Agent mode")
+                Text("Saiyan mode")
                 Text(agentSubtitle).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             if actions.agentBusy {
                 ProgressView().controlSize(.small)
             } else {
-                Toggle("Agent mode", isOn: Binding(get: { actions.agentOn }, set: { actions.setAgent($0) }))
+                Toggle("Saiyan mode", isOn: Binding(get: { actions.agentOn }, set: { actions.setAgent($0) }))
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.mini)
@@ -253,7 +261,7 @@ struct PopoverView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
-        .help("Keeps the Mac awake so Claude Code and Codex keep working. Turning it on asks for your password to stay awake with the lid closed. With the lid closed the Mac can get hot, so don't put it in a bag.")
+        .help("Keeps the Mac awake so Claude Code and Codex keep working. Turning it on asks for your password to stay awake with the lid closed; turning it off doesn't. With the lid closed the Mac can get hot, so don't put it in a bag.")
     }
 
     /// E10.1: what's waiting on me, blocked sessions first. Shown under the list and the details.

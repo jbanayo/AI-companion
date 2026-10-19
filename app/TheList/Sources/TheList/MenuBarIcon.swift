@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import TheListCore
 
-/// The menu bar icon with its count (E4.4). The hair turns Super Saiyan while agent mode is on
-/// (E9). A yellow dot means Claude or Codex is waiting on me (E10.1); a coral dot means
+/// The menu bar icon with its count (E4.4). The hair turns Super Saiyan while Saiyan mode is on
+/// (E9, E11). A yellow dot means Claude or Codex is waiting on me (E10.1); a coral dot means
 /// something is due today or overdue. Menu bar labels are drawn as templates, which ignore
 /// color, so a dot needs a non-template image; the hair and count then use the label color,
 /// resolved when drawn, to keep following light/dark.
@@ -42,7 +42,7 @@ enum MenuBarIcon {
         image.isTemplate = dots.isEmpty // template: follows the menu bar's light/dark appearance
         let wait = waiting ? ", Claude or Codex is waiting on you" : ""
         let due = badge.alert ? ", something due today or overdue" : ""
-        let agent = agentMode ? ", agent mode on" : ""
+        let agent = agentMode ? ", Saiyan mode on" : ""
         image.accessibilityDescription = "The Companion, \(badge.count) urgent\(wait)\(due)\(agent)"
         return image
     }

@@ -36,7 +36,7 @@ Two rules on top of the per-story pick:
 | **E3 — Claude behavior** | Claude notices my tasks, asks first, and respects the on/off switch | 4 | M1 |
 | **E4 — Menu bar app** | The List shows in the menu bar and stays in sync with the file | 4 | M2 |
 | **E5 — Acting on tasks** | Tick, re-prioritize, quick-add, click through to links | 4 | M2 |
-| **E6 — The dog** | Draggable pixel dog that reacts to the list | 6 | M3 |
+| **E6 — The dog** | *Dropped 2026-10-19, replaced by the E11 stickmen* | 6 | — |
 | **E7 — Polish** | Settings, archive, session resume, launch at login, widget | 5 | M4 |
 | **E8 — Groups & Reminders** | Split tasks into groups (BYC, personal, …); one-way export to Apple Reminders | 4 | M4 |
 
@@ -55,7 +55,6 @@ AI Companion/
 ├── spec/            format.md + fixtures/ (shared by MCP server and app)
 ├── mcp/             the-list-mcp (TypeScript)
 ├── app/             The List (Xcode / SwiftUI)
-├── pet/             dog sprites
 └── data/            TODO.md, settings.json, archive/   ← gitignored
 ```
 
@@ -238,6 +237,8 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ## E6 — The dog
 
+*Dropped 2026-10-19. A floating desktop pet would cost memory and attention all the time. The stickmen in the popover (E11) show agent state instead, and only draw while the popover is open. Kept below for the record.*
+
 ### E6.1 Floating pet window · M · **Opus** · [P1]
 *As me, I want a small window on my desktop where the dog lives.*
 - [ ] A transparent, borderless, always-on-top panel about 64–96 px wide, visible on all Spaces.
@@ -277,7 +278,7 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E7.1 Settings screen · M · **Sonnet** · [A8, C9]
 *As me, I want one place to change how The List behaves.*
-- [ ] Settings: file location, launch at login, pet on/off, reset pet position, archive window (days), **proactive suggestions on/off**.
+- [ ] Settings: file location, launch at login, archive window (days), **proactive suggestions on/off**.
 - [ ] The proactive switch writes to `data/settings.json`, so Claude picks up the change on its next check.
 
 ### E7.2 Archive · S · **Haiku** · [D5]
@@ -338,7 +339,7 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ---
 
-## E9 — Agent mode
+## E9 — Agent mode (Saiyan mode since E11)
 
 *Added 2026-10-15. The app's display name becomes "The Companion". The bundle id, the MCP server name and the Reminders prefix stay the same.*
 
@@ -357,14 +358,37 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E10.1 Yellow dot when an agent needs me · M · **Opus**
 *As me, I want to see at a glance when Claude Code or Codex is waiting on me, so a long job doesn't sit blocked while I think it's working.*
-- [x] `hooks/agent-status.sh`, run from Claude Code and Codex hooks, writes one file per waiting session to `data/agents/` and deletes it when work resumes. It always exits 0 and prints nothing.
+- [x] `hooks/agent-status.sh`, run from Claude Code and Codex hooks, keeps one file per live session in `/tmp/the-companion-<uid>/agents/` (Codex's hook sandbox can write to `/tmp` but not the repo) and deletes it when the session ends. It always exits 0 and prints nothing.
 - [x] A yellow dot (amber `#F5B800`) on the menu bar icon, next to the coral due-today dot. The accessibility text says so.
 - [x] "Waiting on you" in the popover, above agent mode: agent, project, why, how long, and × to dismiss. Blocked sessions come first.
 - [x] Files older than 12 h are ignored. `fixture-check` covers reading the files and the script; `--selftest` covers the icon; `--render --waiting` draws both.
 - [ ] Checked by hand: a Claude Code permission prompt shows the dot, and approving it clears it.
 - [ ] Checked by hand: Codex hooks trusted with `/hooks`, then an approval and a finished turn both show. Also check whether the ChatGPT Codex app runs hooks or only the CLI does.
+
+## E11 — Stickmen and Saiyan mode
+
+*Added 2026-10-19. Replaces E6 (the dog). The main rule: the app stays light.*
+
+### E11.1 A stickman each for Claude and Codex · M · **Opus**
+*As me, I want to see at a glance whether Claude and Codex are working, idle, or out of tokens, without the app costing anything when I'm not looking.*
+- [x] At the bottom of the popover, above Saiyan mode: short stickmen on a floor line. Claude has a coral head and Codex a hollow one, each with a caption.
+- [x] Running while working (a prompt or tool call in the last 15 min), sitting when idle or waiting on me, lying down when out of tokens with the reset time when known.
+- [x] The hook script keeps working sessions and records `limited` from Claude's `StopFailure`. Codex's limit comes from the last 64 KB of its newest session log, read once a minute.
+- [x] A `Canvas` of a few strokes at 12 fps, only while a figure runs and the popover window is visible (occlusion state). Still under Reduce Motion. Measured at 0.0% CPU and 13 MB with the popover closed and Claude running.
+- [x] `fixture-check` covers poses, staleness, the Codex log reader and the script's new states. `--render --claude/--codex` draws a frame.
+- [x] Checked by hand: Claude's hooks write its state and the stickman follows it.
+- [ ] **Known issue (2026-10-19): Codex's stickman doesn't move yet.** The Codex desktop app runs the hooks (its log shows `hook/started`/`hook/completed`), but no state file appears. The likely cause is its sandbox blocking writes outside the session's folder, so the files moved to `/tmp`. That's unconfirmed; check `/tmp/the-companion-<uid>/hook-errors.log` after a Codex turn.
+- [ ] Check CPU with the popover open while both run.
+
+### E11.2 Saiyan mode, off without a password · S · **Opus**
+*As me, I want turning the keep-awake switch off to be instant, with no password.*
+- [x] "Agent mode" is now "Saiyan mode" everywhere in the UI. The type and `--agent-on` keep their names.
+- [x] Turning it on still asks for the password, and that prompt also installs `/etc/sudoers.d/the-companion` (checked with `visudo`, root:wheel 0440), allowing only `pmset -a disablesleep 0` without a password.
+- [x] Off and Quit use `sudo -n` with that rule, falling back to the prompt if it's missing. `--selftest` covers both paths.
+- [ ] Checked by hand: on (password), off (no prompt), `pmset -g` shows `SleepDisabled 0`, `sudo -l` lists only that command.
+
 ---
 
 ## Deferred to v2 (PRD §10)
 
-Not broken into stories yet: capture from claude.ai web/mobile, a morning digest, more pets and skins, and natural-language due dates in quick-add.
+Not broken into stories yet: capture from claude.ai web/mobile, a morning digest, and natural-language due dates in quick-add.

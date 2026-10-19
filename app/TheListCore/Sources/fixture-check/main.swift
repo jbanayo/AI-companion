@@ -842,7 +842,7 @@ check("loadAgentWaits: blocked first then oldest; malformed, stale and temp file
     return loadAgentWaits(dir: dir + "/missing").isEmpty ? nil : "missing folder should be empty"
 }
 
-check("hooks/agent-status.sh writes a waiting session and deletes it when work resumes") {
+check("hooks/agent-status.sh keeps each session's latest state and deletes it when the session ends") {
     let data = scratchDir("hook")
     defer { try? FileManager.default.removeItem(atPath: data) }
     func run(_ args: [String], _ stdin: String) throws {
@@ -866,10 +866,93 @@ check("hooks/agent-status.sh writes a waiting session and deletes it when work r
     w = loadAgentWaits(dir: data + "/agents")
     if w.count != 1 || w[0].state != .finished { return "after finished: \(w)" }
     try run(["claude", "working"], event)
-    if !loadAgentWaits(dir: data + "/agents").isEmpty { return "working should delete it" }
+    if !loadAgentWaits(dir: data + "/agents").isEmpty { return "working isn't waiting on me" }
+    if loadAgentSessions(dir: data + "/agents").map(\.state) != [.working] { return "working should be kept" }
+    let fail = #"{"session_id":"s-1","cwd":"/x/proj","error":"rate_limit","last_assistant_message":"You've hit your session limit · resets 3:45pm"}"#
+    try run(["claude", "limited", "out of tokens"], fail)
+    let l = loadAgentSessions(dir: data + "/agents")
+    if l.map(\.state) != [.limited] || l.first?.resets != "3:45pm" { return "limited: \(l)" }
+    try run(["claude", "pretool"], #"{"session_id":"s-1","tool_name":"AskUserQuestion"}"#)
+    if loadAgentSessions(dir: data + "/agents").first?.reason != "has a question" { return "pretool on a question is waiting" }
+    try run(["claude", "pretool"], #"{"session_id":"s-1","tool_name":"Bash"}"#)
+    if loadAgentSessions(dir: data + "/agents").map(\.state) != [.working] { return "pretool on any other tool is working" }
+    try run(["claude", "ended"], event)
+    if !loadAgentSessions(dir: data + "/agents").isEmpty { return "ended should delete it" }
     try run(["codex", "waiting"], "not json")
     try run(["someone", "waiting"], event)
     return loadAgentWaits(dir: data + "/agents").isEmpty ? nil : "bad input or agent wrote a file"
+}
+
+print("Stickman poses (E11):")
+
+check("agentPose: out of usage beats working beats idle; stale work and old failures don't count") {
+    let now = ISO8601DateFormatter().date(from: "2026-10-19T12:00:00Z")!
+    func s(_ agent: String, _ state: AgentWait.State, minutesAgo: Double, cwd: String = "/x/proj", resets: String = "") -> AgentWait {
+        AgentWait(agent: agent, session: UUID().uuidString, state: state, reason: "", cwd: cwd,
+                  since: now.addingTimeInterval(-minutesAgo * 60), path: "", resets: resets)
+    }
+    let pose = { (sessions: [AgentWait]) in agentPose(agent: "claude", sessions: sessions, now: now) }
+    if pose([]) != .sitting { return "no sessions" }
+    if pose([s("claude", .working, minutesAgo: 2, cwd: "/x/AI Companion"), s("codex", .working, minutesAgo: 1)])
+        != .running(project: "AI Companion") { return "working" }
+    if pose([s("claude", .working, minutesAgo: 16)]) != .sitting { return "16 minutes of silence is idle" }
+    if pose([s("claude", .finished, minutesAgo: 1), s("claude", .waiting, minutesAgo: 3)]) != .sitting { return "waiting on me sits" }
+    if pose([s("claude", .limited, minutesAgo: 10, resets: "3:45pm"), s("claude", .working, minutesAgo: 30)])
+        != .lying(resets: "3:45pm") { return "limited after the last work" }
+    if pose([s("claude", .limited, minutesAgo: 10), s("claude", .working, minutesAgo: 1)])
+        != .running(project: "proj") { return "working again clears it" }
+    if pose([s("claude", .limited, minutesAgo: 6 * 60)]) != .sitting { return "an old failure expires" }
+    let codex = AgentLimit(until: now.addingTimeInterval(600), resets: "12:10pm")
+    if agentPose(agent: "codex", sessions: [s("codex", .working, minutesAgo: 1)], limit: codex, now: now)
+        != .lying(resets: "12:10pm") { return "codex log limit" }
+    return nil
+}
+
+check("codexLimit reads the last token_count line; full windows and reached flags count until reset") {
+    let now = Date(timeIntervalSince1970: 1_792_400_000)
+    func line(_ primary: Double, _ secondary: Double, reached: String?, primaryReset: Int = 1_792_402_927) -> String {
+        let r = reached.map { "\"\($0)\"" } ?? "null"
+        return #"{"timestamp":"t","type":"event_msg","payload":{"type":"token_count","info":{},"rate_limits":{"primary":{"used_percent":"#
+            + "\(primary)" + #","window_minutes":300,"resets_at":"# + "\(primaryReset)" + #"},"secondary":{"used_percent":"#
+            + "\(secondary)" + #","window_minutes":10080,"resets_at":1792882525},"rate_limit_reached_type":"# + r + "}}}"
+    }
+    let other = #"{"type":"event_msg","payload":{"type":"agent_message","message":"hi"}}"#
+    if codexLimit(fromLogTail: [line(100, 50, reached: nil), line(48, 70, reached: nil), other].joined(separator: "\n"), now: now) != nil {
+        return "only the last usage line counts"
+    }
+    guard let full = codexLimit(fromLogTail: line(100, 70, reached: nil), now: now),
+          full.until == Date(timeIntervalSince1970: 1_792_402_927) else { return "primary at 100%" }
+    guard let weekly = codexLimit(fromLogTail: line(40, 100, reached: "secondary"), now: now),
+          weekly.until == Date(timeIntervalSince1970: 1_792_882_525) else { return "weekly reached" }
+    if codexLimit(fromLogTail: line(100, 10, reached: nil, primaryReset: 1_792_399_000), now: now) != nil { return "a passed reset" }
+    if codexLimit(fromLogTail: "not json\n" + other, now: now) != nil { return "no usage line" }
+    return nil
+}
+
+check("newestCodexLog picks the log written to last, even in an older day folder; readTail keeps whole lines") {
+    let root = scratchDir("codex")
+    defer { try? FileManager.default.removeItem(atPath: root) }
+    let fm = FileManager.default
+    for (day, name) in [("2026/10/16", "rollout-2026-10-16T09-00-00-a.jsonl"), ("2026/10/18", "rollout-2026-10-18T08-00-00-b.jsonl"),
+                        ("2026/10/18", "rollout-2026-10-18T17-00-00-c.jsonl"), ("2026/09/30", "rollout-2026-09-30T23-00-00-d.jsonl")] {
+        try fm.createDirectory(atPath: "\(root)/\(day)", withIntermediateDirectories: true)
+        fm.createFile(atPath: "\(root)/\(day)/\(name)", contents: Data("x\n".utf8))
+    }
+    fm.createFile(atPath: "\(root)/2026/10/18/notes.txt", contents: Data())
+    // The conversation that started on the 16th is the one still being written to.
+    let base = Date(timeIntervalSince1970: 1_792_300_000)
+    for (path, minutes) in [("2026/10/16/rollout-2026-10-16T09-00-00-a.jsonl", 90.0), ("2026/10/18/rollout-2026-10-18T08-00-00-b.jsonl", 10),
+                            ("2026/10/18/rollout-2026-10-18T17-00-00-c.jsonl", 30), ("2026/09/30/rollout-2026-09-30T23-00-00-d.jsonl", 0)] {
+        try fm.setAttributes([.modificationDate: base.addingTimeInterval(minutes * 60)], ofItemAtPath: "\(root)/\(path)")
+    }
+    guard let newest = newestCodexLog(sessionsDir: root), newest.hasSuffix("2026/10/16/rollout-2026-10-16T09-00-00-a.jsonl") else {
+        return "newest: \(String(describing: newestCodexLog(sessionsDir: root)))"
+    }
+    if newestCodexLog(sessionsDir: root + "/missing") != nil { return "missing folder" }
+    let log = "\(root)/tail.jsonl"
+    fm.createFile(atPath: log, contents: Data((String(repeating: "a", count: 50) + "\nsecond\nthird\n").utf8))
+    if readTail(path: log, bytes: 16) != "second\nthird\n" { return "tail: \(String(describing: readTail(path: log, bytes: 16)))" }
+    return readTail(path: log)?.hasPrefix("aaaa") == true ? nil : "a short file is read whole"
 }
 
 print("\n\(passed) passed, \(failed) failed")

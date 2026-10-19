@@ -1,7 +1,7 @@
 import AppKit
 
 /// The logo (chosen 2026-10-19). In the menu bar: Goku's hair, which turns Super Saiyan while
-/// agent mode is on. As the app icon: a Saiyan monkey tail. Drawn in code so the shapes live in
+/// Saiyan mode is on. As the app icon: a Saiyan monkey tail. Drawn in code so the shapes live in
 /// one place. All drawing uses top-left-origin coordinates, like the SVGs they came from.
 enum Logo {
     static let ink = CGColor(srgbRed: 0x16 / 255, green: 0x18 / 255, blue: 0x1D / 255, alpha: 1)

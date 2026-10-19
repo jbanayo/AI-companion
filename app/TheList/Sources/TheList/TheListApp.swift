@@ -26,7 +26,7 @@ struct TheListApp: App {
         return store
     }()
     @State private var activity: AgentActivity = {
-        let activity = AgentActivity(dir: agentsDir(forTodoPath: ListStore.defaultTodoPath()))
+        let activity = AgentActivity(dir: agentsDir())
         activity.start()
         return activity
     }()
@@ -54,6 +54,8 @@ struct TheListApp: App {
                 setAgent: agent.setOn,
                 waits: activity.waits,
                 dismissWait: activity.dismiss,
+                claude: activity.claude,
+                codex: activity.codex,
                 quit: {
                     agent.shutdown()
                     NSApplication.shared.terminate(nil)

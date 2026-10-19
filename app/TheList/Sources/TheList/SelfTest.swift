@@ -116,16 +116,23 @@ enum SelfTest {
             store.snapshot.filter == .all && store.snapshot.taskGroups.isEmpty && item("Review the PR") != nil
         }
 
-        // E9: agent mode, against a fake so nothing touches power settings or asks for a password.
+        // E9, E11: Saiyan mode, against a fake so nothing touches power settings or asks for a password.
         let power = FakePower()
         let agent = AgentMode(power: power)
         agent.setOn(true)
-        await expect("agent mode on: screen assertion held, lid awake, shows as on") {
-            !agent.busy && agent.isOn && agent.lidAwake && power.holding && power.lid
+        await expect("Saiyan mode on: screen assertion held, lid awake, one password prompt that installs the rule") {
+            !agent.busy && agent.isOn && agent.lidAwake && power.holding && power.lid && power.prompts == 1 && power.rule
         }
         agent.setOn(false)
-        await expect("agent mode off: assertion released, lid sleeps again") {
-            !agent.busy && !agent.isOn && !power.holding && !power.lid
+        await expect("Saiyan mode off: assertion released, lid sleeps again, no password prompt") {
+            !agent.busy && !agent.isOn && !power.holding && !power.lid && power.prompts == 1
+        }
+        agent.setOn(true)
+        await expect("on again: asks for the password") { !agent.busy && agent.lidAwake && power.prompts == 2 }
+        power.rule = false
+        agent.setOn(false)
+        await expect("off without the rule: falls back to the password prompt") {
+            !agent.busy && !agent.isOn && !power.lid && power.prompts == 3
         }
         power.refuseLid = true
         agent.setOn(true)
@@ -137,8 +144,8 @@ enum SelfTest {
         let off = MenuBarIcon.image(for: Badge(count: 2, alert: false))
         let on = MenuBarIcon.image(for: Badge(count: 2, alert: false), agentMode: true)
         let due = MenuBarIcon.image(for: Badge(count: 2, alert: true))
-        await expect("menu bar icon: Super Saiyan hair is narrower, says agent mode") {
-            on.size.width < off.size.width && (on.accessibilityDescription ?? "").contains("agent mode on")
+        await expect("menu bar icon: Super Saiyan hair is narrower, says Saiyan mode") {
+            on.size.width < off.size.width && (on.accessibilityDescription ?? "").contains("Saiyan mode on")
         }
         await expect("menu bar icon: due today adds the dot and drops the template") {
             due.size.width > off.size.width && off.isTemplate && !due.isTemplate
@@ -161,15 +168,32 @@ enum SelfTest {
 private final class FakePower: PowerControl, @unchecked Sendable {
     private let lock = NSLock()
     private var _lid = false
+    private var _prompts = 0
+    private var _rule = false
     var holding = false
     var refuseLid = false
     var lid: Bool { lock.withLock { _lid } }
+    /// Password prompts shown.
+    var prompts: Int { lock.withLock { _prompts } }
+    /// The sudoers rule for a quiet off is installed.
+    var rule: Bool {
+        get { lock.withLock { _rule } }
+        set { lock.withLock { _rule = newValue } }
+    }
 
     @MainActor func holdAwake() -> Bool { holding = true; return true }
     @MainActor func releaseAwake() { holding = false }
     func lidAwake() -> Bool { lid }
     func setLidAwake(_ on: Bool) throws {
+        lock.withLock { _prompts += 1 }
         if lock.withLock({ refuseLid }) { throw PowerError(description: "User canceled. (-128)") }
-        lock.withLock { _lid = on }
+        lock.withLock { _lid = on; _rule = true }
+    }
+    func releaseLidQuietly() -> Bool {
+        lock.withLock {
+            guard _rule else { return false }
+            _lid = false
+            return true
+        }
     }
 }

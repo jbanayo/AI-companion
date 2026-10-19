@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import TheListCore
 
-/// `TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark] [--show-done] [--detail "task title"] [--group id] [--agent-on] [--waiting]`
+/// `TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark] [--show-done] [--detail "task title"] [--group id] [--agent-on] [--waiting] [--claude running|sitting|lying] [--codex running|sitting|lying]`
 /// Draws the popover and the menu bar icon for a TODO.md into PNGs without launching the app,
 /// so layout can be checked from the command line.
 enum Render {
@@ -25,6 +25,15 @@ enum Render {
             cwd: "/Users/me/AI Companion", since: Date().addingTimeInterval(-240), path: "/dev/null"
         )] : []
 
+        // E11: the stickmen's poses, for checking the scene by eye.
+        func pose(_ flag: String) -> AgentPose {
+            switch value(flag) {
+            case "running": .running(project: "AI Companion")
+            case "lying": .lying(resets: "3:45pm")
+            default: .sitting
+            }
+        }
+
         let bytes = (try? Data(contentsOf: URL(fileURLWithPath: todoPath))).map { [UInt8]($0) } ?? []
         let groups = readSettings(path: settingsPath(forTodoPath: todoPath)).groups
         let filter = value("--group").map(GroupFilter.init(storageKey:)) ?? .all
@@ -34,7 +43,10 @@ enum Render {
             (snapshot.groups.flatMap(\.items) + snapshot.done).first { $0.title == title }.map(PopoverView.key)
         }
         let popover = PopoverView(
-            snapshot: snapshot, today: today, actions: PopoverActions(agentOn: agentOn, agentLid: agentOn, waits: waits, todoPath: todoPath), scrollable: false,
+            snapshot: snapshot, today: today, actions: PopoverActions(
+                agentOn: agentOn, agentLid: agentOn, waits: waits, claude: pose("--claude"), codex: pose("--codex"),
+                sceneLive: false, todoPath: todoPath
+            ), scrollable: false,
             showDone: args.contains("--show-done"), selected: detail
         )
             .background(dark ? Color(white: 0.16) : Color(white: 0.97))
