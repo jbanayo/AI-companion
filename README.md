@@ -1,6 +1,6 @@
 # AI Companion
 
-Personal project. Home of **The Companion** (formerly The List): a macOS menu bar app with a todo list that Claude fills in, a Saiyan mode that keeps Claude Code and Codex running, and a stickman for each of them that shows what they're doing. The todo view inside it is still called The List.
+Personal project. Home of **The Companion** (formerly The List): a macOS menu bar app with a todo list that Claude fills in, and a Saiyan mode that keeps Claude Code and Codex running. The todo view inside it is still called The List.
 
 - What and why: [PRD - The List.md](PRD%20-%20The%20List.md)
 - Build plan, story by story: [EPICS - The List.md](EPICS%20-%20The%20List.md)
@@ -67,9 +67,9 @@ Hooks in both tools run `hooks/agent-status.sh <claude|codex> <state>`. The scri
   - Codex runs a new hook only after it has been trusted. Open the Codex CLI once (`/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex`), type `/hooks`, and trust them.
   - Codex's `notify` setting is left alone. It only reports finished turns, and Computer Use already uses it.
 
-### Stickmen
+### Stickmen (hidden)
 
-At the bottom of the popover, above Saiyan mode, there's a short stickman for Claude (coral head) and one for Codex:
+**Hidden since 2026-10-20.** The code is still there (`AgentScene.swift`), but the popover doesn't show it; see the comment in `PopoverView.swift` to bring it back. When shown, it's a short stickman for Claude (coral head) and one for Codex, above Saiyan mode:
 
 - **Running:** that agent is working. That means a prompt or a tool call in the last 15 minutes, so a session that dies without a hook stops counting after that.
 - **Sitting:** it has tokens but nothing to do, including when it's waiting on you.
@@ -102,7 +102,7 @@ The logo is drawn in code in `Logo.swift` (chosen 2026-10-19, replacing the 2026
 - **Turning it off, or quitting, doesn't ask for the password.** The first time you turn it on, the same password prompt also installs `/etc/sudoers.d/the-companion`. That one-line rule lets exactly `/usr/bin/pmset -a disablesleep 0` run without a password, which can only give the Mac its normal sleep back. If the rule is missing, turning it off falls back to the password prompt (and installs the rule). To remove it: `sudo rm /etc/sudoers.d/the-companion`.
 - It isn't remembered across launches. If a crash leaves the lid setting on, the switch shows on at the next launch, so you can turn it off. You can also check by hand with `pmset -g | grep SleepDisabled`.
 - A closed MacBook that stays awake can get hot. Don't put it in a bag with Saiyan mode on.
-- While it's on, the menu bar hair goes Super Saiyan and both stickmen get gold hair.
+- While it's on, the menu bar hair goes Super Saiyan.
 
 The rename to The Companion changed only the app's display name. The bundle id (`com.jbanayo.thelist`), the MCP server name (`the-list`) and the Reminders list names ("The List · …") are unchanged, so existing permissions, Claude and Codex configs, and exported lists keep working.
 

@@ -75,8 +75,9 @@ struct PopoverView: View {
                 waitingSection
                 Divider()
             }
-            AgentScene(claude: actions.claude, codex: actions.codex, saiyan: actions.agentOn, live: actions.sceneLive)
-            Divider()
+            // E11: the stickmen (`AgentScene`) are hidden since 2026-10-20. To bring them back, put
+            // `AgentScene(claude: actions.claude, codex: actions.codex, saiyan: actions.agentOn,
+            // live: actions.sceneLive)` and a `Divider()` here.
             agentRow
             Divider()
             footer

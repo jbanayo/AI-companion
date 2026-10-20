@@ -370,6 +370,7 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 *Added 2026-10-19. Replaces E6 (the dog). The main rule: the app stays light.*
 
 ### E11.1 A stickman each for Claude and Codex · M · **Opus**
+*Hidden 2026-10-20: I didn't like it. The code stays; the popover no longer shows it.*
 *As me, I want to see at a glance whether Claude and Codex are working, idle, or out of tokens, without the app costing anything when I'm not looking.*
 - [x] At the bottom of the popover, above Saiyan mode: short stickmen on a floor line. Claude has a coral head and Codex a hollow one, each with a caption.
 - [x] Running while working (a prompt or tool call in the last 15 min), sitting when idle or waiting on me, lying down when out of tokens with the reset time when known.
