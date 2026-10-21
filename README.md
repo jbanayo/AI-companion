@@ -52,7 +52,9 @@ The MCP server runs over stdio from `mcp/dist/index.js` (`npm run build` in `mcp
 
 A yellow dot on the menu bar icon means a Claude Code or Codex session is waiting on me. Either it's stuck on a permission prompt or a question, or it finished its turn and wants my next message. The popover lists each one ("Claude · AI Companion, needs permission · 4m"), and × dismisses a stale one. The dot clears when I reply.
 
-Hooks in both tools run `hooks/agent-status.sh <claude|codex> <state>`. The script keeps one file per live session, holding its latest state, in `/tmp/the-companion-<uid>/agents/`, and deletes it when the session ends. The app watches that folder. It's in `/tmp` rather than `data/` because Codex runs hooks inside its sandbox, which can write to `/tmp` but not to this repo. If a write fails anyway, the script adds a line to `/tmp/the-companion-<uid>/hook-errors.log`. Files older than 12 hours are ignored, which covers sessions killed without saying so.
+Hooks in each tool run `hooks/agent-status.sh <claude|codex|antigravity> <state>`. The script keeps one file per live session, holding its latest state, in `/tmp/the-companion-<uid>/agents/`, and deletes it when the session ends. The app watches that folder. It's in `/tmp` rather than `data/` because Codex runs hooks inside its sandbox, which can write to `/tmp` but not to this repo. Files older than 12 hours are ignored, which covers sessions killed without saying so.
+
+When the script gives up (no jq, no session id, a folder it can't write), it adds a line to `/tmp/the-companion-<uid>/hook-errors.log`. To see every hook call with the start of its input, `touch /tmp/the-companion-<uid>/debug`; delete it to stop.
 
 - **Claude Code:** the `hooks` block in `~/.claude/settings.json`.
   - Waiting: `PermissionRequest`, `Notification` (permission and input prompts).
@@ -66,6 +68,17 @@ Hooks in both tools run `hooks/agent-status.sh <claude|codex> <state>`. The scri
   - Working: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Interrupt`. Ended: `SessionEnd`.
   - Codex runs a new hook only after it has been trusted. Open the Codex CLI once (`/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex`), type `/hooks`, and trust them.
   - Codex's `notify` setting is left alone. It only reports finished turns, and Computer Use already uses it.
+- **Antigravity:** `~/.gemini/config/hooks.json`, one named hook, `the-companion`.
+  - Working: `SessionStart`, `PreInvocation`, `PostToolUse` (matcher `*`).
+  - `Stop` runs the script as `stop`: still working if background tasks run (`fullyIdle: false`), out of tokens on `MAX_TOKEN_BUDGET_EXCEEDED`, finished otherwise.
+  - It has no session-end or permission event, so its sessions just age out, and it never shows as blocked on a permission.
+  - Its hooks must print a JSON object; the script prints `{}` for Antigravity only.
+
+### When agents finish
+
+While Saiyan mode is on, "When agents finish" picks what happens once no Claude Code, Codex or Antigravity session is working: keep awake, turn Saiyan off, sleep, or shut down. Waiting on you, finished, out of tokens and ended all count as done. It waits for something to work after you pick, then for everything to stop, then counts down 2 minutes (any new work stops the countdown). Then it turns Saiyan off through the sudoers rule (never a password prompt; without the rule the lid part stays on), and runs `pmset sleepnow` or asks System Events to shut down. Shut down needs the Automation permission the first time.
+
+A working session never goes stale here, since a long build fires no hooks. If one died while working, × it in the list under the switch.
 
 ### Stickmen (hidden)
 

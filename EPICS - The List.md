@@ -388,6 +388,29 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 - [x] Off and Quit use `sudo -n` with that rule, falling back to the prompt if it's missing. `--selftest` covers both paths.
 - [ ] Checked by hand: on (password), off (no prompt), `pmset -g` shows `SleepDisabled 0`, `sudo -l` lists only that command.
 
+## E12 — When agents finish
+
+*Added 2026-10-20. Saiyan mode stays on until I turn it off, so an overnight run kept the Mac awake for hours after the work was done.*
+
+### E12.1 Hooks for Claude, Codex and Antigravity · M · **Opus**
+*As me, I want the app to know reliably when each agent stops working, because the Mac will sleep on it.*
+- [x] `hooks/agent-status.sh` logs every early exit (no jq, unknown agent, no session id, folder not writable, unreadable input) to `hook-errors.log`. A file named `debug` next to the agents folder logs every call with the start of its input.
+- [x] Session id falls back through `session_id`, `sessionId`, `conversationId`, `thread_id`.
+- [x] Antigravity: `antigravity` agent, `conversationId` and `workspacePaths[0]`, prints `{}` as its hooks require. Its `Stop` runs the script as `stop`: `fullyIdle:false` is working, `MAX_TOKEN_BUDGET_EXCEEDED` is limited, anything else finished. "Waiting on you" calls it Antigravity.
+- [x] `fixture-check` covers the error log, Antigravity's states and its `{}`.
+- [ ] `~/.gemini/config/hooks.json` installed, and one Antigravity turn leaves an `antigravity-*.json` that ends `finished`.
+- [ ] Codex: one turn in the CLI and one in the desktop app with `debug` on, then fix whatever `hook-errors.log` shows (closes the E11.1 known issue). Codex's `Interrupt` hook should say `finished`, not `working`.
+
+### E12.2 Sleep or shut down when they're done · M · **Opus**
+*As me, I want to leave a long job running and have the Mac sleep or shut down by itself when every agent is done.*
+- [x] Under Saiyan mode, while it's on: "When agents finish": Keep awake (default), Turn off Saiyan, Sleep, Shut down. Not remembered across launches. Turning Saiyan off by hand disarms it.
+- [x] Only `working` counts as busy, and it never goes stale (a long build fires no hooks). Waiting on me, finished, out of usage and ended all count as done. Nothing fires until something has worked since arming.
+- [x] Once all are done, a 2-minute countdown ("Sleeping in 1:52 · Cancel"); any new work stops it. Then Saiyan off through the sudoers rule, never a password prompt, then `pmset sleepnow` or System Events' shut down. Then it disarms.
+- [x] While armed, the working sessions it waits on, each with × for one that died without saying so.
+- [x] `AfterAgentsClock` in TheListCore, covered by `fixture-check`. `--selftest` covers arming with nothing running, the countdown and its cancel, sleep, shut down, and Turn off Saiyan without the rule. `--render --armed sleep [--countdown]`.
+- [ ] Known gap: a Claude turn that ends while a background subagent or shell still runs writes `finished`. The countdown only covers short gaps. Fix later with `SubagentStart`/`SubagentStop` keeping a per-session count.
+- [ ] Checked by hand: arm Sleep, run a short Claude task, walk away; the Mac sleeps about 2 minutes after and `pmset -g` shows `SleepDisabled 0`. Arm Shut down once and approve the System Events prompt (an ad-hoc signed rebuild may ask again).
+
 ---
 
 ## Deferred to v2 (PRD §10)

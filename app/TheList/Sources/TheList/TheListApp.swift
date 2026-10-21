@@ -25,16 +25,21 @@ struct TheListApp: App {
         store.start()
         return store
     }()
-    @State private var activity: AgentActivity = {
-        let activity = AgentActivity(dir: agentsDir())
-        activity.start()
-        return activity
-    }()
-    @State private var agent: AgentMode = {
+    @State private var activity: AgentActivity
+    @State private var agent: AgentMode
+    @State private var after: AfterAgents
+
+    init() {
         let agent = AgentMode()
         agent.refresh()
-        return agent
-    }()
+        let after = AfterAgents(agent: agent)
+        let activity = AgentActivity(dir: agentsDir())
+        activity.onReload = after.update
+        activity.start()
+        _activity = State(initialValue: activity)
+        _agent = State(initialValue: agent)
+        _after = State(initialValue: after)
+    }
 
     var body: some Scene {
         MenuBarExtra {
@@ -51,7 +56,14 @@ struct TheListApp: App {
                 agentOn: agent.isOn,
                 agentLid: agent.lidAwake,
                 agentBusy: agent.busy,
-                setAgent: agent.setOn,
+                setAgent: { on in
+                    agent.setOn(on)
+                    if !on { after.arm(nil) }
+                },
+                afterAction: after.action,
+                afterBusy: after.busy,
+                afterRemaining: after.remaining,
+                setAfter: after.arm,
                 waits: activity.waits,
                 dismissWait: activity.dismiss,
                 claude: activity.claude,

@@ -20,6 +20,12 @@ struct PopoverActions {
     var agentLid = false
     var agentBusy = false
     var setAgent: @MainActor (Bool) -> Void = { _ in }
+    /// E12.2: what to do once every agent is done (nil keeps the Mac awake), the working sessions
+    /// it waits on, and the seconds left once they've all stopped.
+    var afterAction: AfterAgents.Action?
+    var afterBusy: [AgentWait] = []
+    var afterRemaining: Int?
+    var setAfter: @MainActor (AfterAgents.Action?) -> Void = { _ in }
     /// E10.1: Claude Code and Codex sessions waiting on me.
     var waits: [AgentWait] = []
     var dismissWait: @MainActor (AgentWait) -> Void = { _ in }
@@ -240,8 +246,19 @@ struct PopoverView: View {
     }
 
     /// E9, E11: Saiyan mode, one switch for keeping agents running. Shown under the list and the
-    /// details alike.
+    /// details alike. E12.2: while it's on, what to do when the agents finish.
     private var agentRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            saiyanSwitch
+            if actions.agentOn && !actions.agentBusy {
+                afterAgentsRow
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+    }
+
+    private var saiyanSwitch: some View {
         HStack(spacing: 8) {
             Image(systemName: "bolt.fill")
                 .foregroundStyle(actions.agentOn ? AnyShapeStyle(.yellow) : AnyShapeStyle(.secondary))
@@ -260,9 +277,66 @@ struct PopoverView: View {
                     .controlSize(.mini)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .help("Keeps the Mac awake so Claude Code and Codex keep working. Turning it on asks for your password to stay awake with the lid closed; turning it off doesn't. With the lid closed the Mac can get hot, so don't put it in a bag.")
+        .help("Keeps the Mac awake so Claude Code, Codex and Antigravity keep working. Turning it on asks for your password to stay awake with the lid closed; turning it off doesn't. With the lid closed the Mac can get hot, so don't put it in a bag.")
+    }
+
+    /// E12.2: the pick, then either the countdown or the sessions still working, each with × for
+    /// one that died without saying so.
+    private var afterAgentsRow: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 8) {
+                Color.clear.frame(width: 14, height: 1)
+                Text("When agents finish").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Picker("When agents finish", selection: Binding(get: { actions.afterAction }, set: { actions.setAfter($0) })) {
+                    Text("Keep awake").tag(AfterAgents.Action?.none)
+                    ForEach(AfterAgents.Action.allCases, id: \.self) { Text($0.label).tag(Optional($0)) }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .fixedSize()
+            }
+            if let action = actions.afterAction {
+                if let left = actions.afterRemaining {
+                    HStack(spacing: 8) {
+                        Color.clear.frame(width: 14, height: 1)
+                        Text("\(action.doing) in \(left / 60):\(String(format: "%02d", left % 60))")
+                            .font(.caption.monospacedDigit())
+                        Spacer()
+                        Button("Cancel") { actions.setAfter(nil) }.buttonStyle(.borderless).font(.caption)
+                    }
+                } else if actions.afterBusy.isEmpty {
+                    afterNote("Waits for an agent to start, then finish")
+                } else {
+                    ForEach(actions.afterBusy, id: \.path) { session in
+                        HStack(spacing: 8) {
+                            Color.clear.frame(width: 14, height: 1)
+                            Text(session.project.isEmpty ? session.agentName : "\(session.agentName) · \(session.project)")
+                                .font(.caption).lineLimit(1)
+                            Text("working \(waitedFor(session.since))").font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Image(systemName: "xmark")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .contentShape(Rectangle())
+                                .onTapGesture { actions.dismissWait(session) }
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityLabel("Stop waiting on this one")
+                                .help("Stop waiting on this one, if it closed without saying so. It comes back the next time it works.")
+                        }
+                        .help(session.cwd)
+                    }
+                }
+            }
+        }
+    }
+
+    private func afterNote(_ text: String) -> some View {
+        HStack(spacing: 8) {
+            Color.clear.frame(width: 14, height: 1)
+            Text(text).font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     /// E10.1: what's waiting on me, blocked sessions first. Shown under the list and the details.

@@ -141,6 +141,51 @@ enum SelfTest {
         }
         agent.shutdown()
         await expect("quit: assertion released") { !agent.isOn && !power.holding }
+
+        // E12.2: When agents finish, with a short grace so it runs in under a second.
+        power.refuseLid = false
+        power.rule = true
+        func session(_ state: AgentWait.State) -> AgentWait {
+            AgentWait(agent: "claude", session: "s", state: state, reason: "", cwd: "/x/proj", since: Date(), path: "")
+        }
+        let after = AfterAgents(agent: agent, power: power, grace: 0.3)
+        agent.setOn(true)
+        await expect("Saiyan on again for E12.2") { !agent.busy && agent.lidAwake }
+        after.arm(.sleep)
+        after.update([session(.finished)])
+        try? await Task.sleep(for: .seconds(0.6))
+        await expect("armed with nothing working: doesn't fire") {
+            after.action == .sleep && after.remaining == nil && agent.isOn && power.sleeps == 0
+        }
+        after.update([session(.working)])
+        await expect("working: lists it, no countdown") { after.busy.count == 1 && after.remaining == nil }
+        after.update([session(.finished)])
+        await expect("all done: counts down") { after.remaining != nil }
+        after.update([session(.working)])
+        await expect("work again: the countdown stops") { after.remaining == nil && after.action == .sleep }
+        var prompts = power.prompts
+        after.update([session(.waiting)])
+        await expect("done for the grace: Saiyan off without a password, then sleep, then disarmed") {
+            power.sleeps == 1 && !agent.isOn && !agent.lidAwake && after.action == nil && power.prompts == prompts
+        }
+        agent.setOn(true)
+        await expect("Saiyan on for shut down") { !agent.busy && agent.lidAwake }
+        after.arm(.shutDown)
+        after.update([session(.working)])
+        after.update([])
+        await expect("a session that ended counts as done: shuts down") { power.shutdowns == 1 && !agent.isOn }
+        agent.setOn(true)
+        await expect("Saiyan on for turn-off-only") { !agent.busy && agent.lidAwake }
+        power.rule = false
+        prompts = power.prompts
+        after.arm(.saiyanOff)
+        after.update([session(.working)])
+        after.update([session(.finished)])
+        await expect("Turn off Saiyan without the sudoers rule: no prompt, screen part off, no sleep") {
+            !agent.busy && !power.holding && power.prompts == prompts && power.sleeps == 1 && power.shutdowns == 1
+                && after.action == nil
+        }
+        agent.shutdown()
         let off = MenuBarIcon.image(for: Badge(count: 2, alert: false))
         let on = MenuBarIcon.image(for: Badge(count: 2, alert: false), agentMode: true)
         let due = MenuBarIcon.image(for: Badge(count: 2, alert: true))
@@ -196,4 +241,15 @@ private final class FakePower: PowerControl, @unchecked Sendable {
             return true
         }
     }
+    private var _sleeps = 0
+    private var _shutdowns = 0
+    var sleeps: Int { lock.withLock { _sleeps } }
+    var shutdowns: Int { lock.withLock { _shutdowns } }
+    func sleepNow() throws {
+        try lock.withLock {
+            if _lid { throw PowerError(description: "sleep is disabled") }
+            _sleeps += 1
+        }
+    }
+    func shutDown() throws { lock.withLock { _shutdowns += 1 } }
 }

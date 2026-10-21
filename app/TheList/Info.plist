@@ -28,6 +28,9 @@
 	<string>The Companion copies your open tasks into Reminders, one list per group, when you choose Export to Reminders.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>The Companion copies your open tasks into Reminders, one list per group, when you choose Export to Reminders.</string>
+	<!-- E12.2: When agents finish → Shut down asks System Events to shut down the Mac. -->
+	<key>NSAppleEventsUsageDescription</key>
+	<string>The Companion shuts down the Mac when your agents finish, if you picked Shut down under Saiyan mode.</string>
 	<!-- Where TODO.md lives until Settings (E7.1) can change it. Filled in by build-app.sh. -->
 	<key>TheListTodoPath</key>
 	<string>__TODO_PATH__</string>

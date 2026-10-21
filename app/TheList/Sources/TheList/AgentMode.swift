@@ -21,6 +21,11 @@ protocol PowerControl: Sendable {
     /// Lets the Mac sleep with the lid closed again without a password (E11), through that
     /// sudoers rule. False if the rule isn't there or it failed.
     func releaseLidQuietly() -> Bool
+    /// E12.2: sleep now (`pmset sleepnow`, no password). Lid sleep must be allowed again first.
+    func sleepNow() throws
+    /// E12.2: the normal shutdown, through System Events, so apps get to quit. Needs the
+    /// Automation permission, which macOS asks for the first time.
+    func shutDown() throws
 }
 
 /// E9, E11 "Saiyan mode": keeps Claude Code and Codex running while the screen is off, and (with
@@ -55,7 +60,9 @@ final class AgentMode {
         }
     }
 
-    func setOn(_ on: Bool) {
+    /// `askPassword: false` is for turning off with nobody at the Mac (E12.2): without the
+    /// sudoers rule the lid part stays on rather than wait on a prompt no one will answer.
+    func setOn(_ on: Bool, askPassword: Bool = true) {
         guard !busy else { return }
         if on {
             screenAwake = power.holdAwake()
@@ -69,7 +76,13 @@ final class AgentMode {
         let power = power
         Task.detached {
             // Off goes through the sudoers rule; the password prompt only if that isn't set up.
-            let outcome = !on && power.releaseLidQuietly() ? .success(()) : Result { try power.setLidAwake(on) }
+            let outcome: Result<Void, Error> = if !on && power.releaseLidQuietly() {
+                .success(())
+            } else if !on && !askPassword {
+                .failure(PowerError(description: "no sudoers rule, and no one to ask for the password"))
+            } else {
+                Result { try power.setLidAwake(on) }
+            }
             let lid = power.lidAwake()
             await MainActor.run {
                 self.busy = false
@@ -92,7 +105,7 @@ final class AgentMode {
         if power.lidAwake(), !power.releaseLidQuietly() { try? power.setLidAwake(false) }
     }
 
-    private func show(_ text: String) {
+    func show(_ text: String) {
         message = text
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(6))
@@ -159,6 +172,14 @@ final class SystemPower: PowerControl, @unchecked Sendable {
     func releaseLidQuietly() -> Bool {
         guard FileManager.default.fileExists(atPath: Self.sudoersFile) else { return false }
         return (try? run("/usr/bin/sudo", ["-n"] + Self.quietOff)) != nil
+    }
+
+    func sleepNow() throws {
+        _ = try run("/usr/bin/pmset", ["sleepnow"])
+    }
+
+    func shutDown() throws {
+        _ = try run("/usr/bin/osascript", ["-e", "tell application \"System Events\" to shut down"])
     }
 
     private func run(_ tool: String, _ args: [String]) throws -> String {

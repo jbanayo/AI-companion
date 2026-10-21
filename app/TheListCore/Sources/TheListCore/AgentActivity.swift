@@ -1,4 +1,4 @@
-// E10.1, E11: what Claude Code and Codex are doing.
+// E10.1, E11, E12: what Claude Code, Codex and Antigravity are doing.
 //
 // hooks/agent-status.sh keeps one JSON file per live session in `agentsDir()` with its latest
 // state, and deletes it when the session ends. This reads them back: the waiting ones drive the
@@ -45,7 +45,13 @@ public struct AgentWait: Equatable, Sendable {
         self.resets = resets
     }
 
-    public var agentName: String { agent == "codex" ? "Codex" : "Claude" }
+    public var agentName: String {
+        switch agent {
+        case "codex": "Codex"
+        case "antigravity": "Antigravity"
+        default: "Claude"
+        }
+    }
     /// The last part of `cwd`, e.g. "AI Companion".
     public var project: String { cwd.isEmpty ? "" : URL(fileURLWithPath: cwd).lastPathComponent }
     /// Shown in "Waiting on you" and counted by the yellow dot.
@@ -98,6 +104,48 @@ public func agentWaits(_ sessions: [AgentWait]) -> [AgentWait] {
         if $0.state != $1.state { return $0.state == .waiting }
         return $0.since < $1.since
     }
+}
+
+// MARK: - When agents finish (E12.2)
+
+/// How long every agent has to stay done before the Mac sleeps or shuts down. Covers a turn that
+/// ends and starts again right away, like Claude picking up a background task's result.
+public let afterAgentsGrace: TimeInterval = 2 * 60
+
+/// When to act once every agent is done. Fed every reload of the sessions while armed.
+///
+/// Only `working` counts as busy. Waiting on me, finished, out of usage and gone are all done:
+/// nothing more happens until I'm back. Unlike `agentPose`, a working session never goes stale
+/// here, because a long build fires no hooks and sleeping in the middle of one is the worst
+/// outcome. A session that died while working holds the Mac awake until I dismiss it or it's
+/// 12 h old.
+public struct AfterAgentsClock: Equatable, Sendable {
+    /// Something has worked since arming. Until then nothing fires, so arming with no agent
+    /// running doesn't sleep the Mac on the spot.
+    public private(set) var sawWork = false
+    /// When the last working session stopped; nil while any works, or before any has.
+    public private(set) var doneSince: Date?
+    public let grace: TimeInterval
+
+    public init(grace: TimeInterval = afterAgentsGrace) {
+        self.grace = grace
+    }
+
+    public mutating func update(_ sessions: [AgentWait], now: Date = Date()) {
+        if sessions.contains(where: { $0.state == .working }) {
+            sawWork = true
+            doneSince = nil
+        } else if sawWork, doneSince == nil {
+            doneSince = now
+        }
+    }
+
+    /// Seconds left before acting, nil if not counting down.
+    public func remaining(now: Date = Date()) -> TimeInterval? {
+        doneSince.map { max(0, grace - now.timeIntervalSince($0)) }
+    }
+
+    public func due(now: Date = Date()) -> Bool { remaining(now: now) == 0 }
 }
 
 /// "4m", "2h", "now".

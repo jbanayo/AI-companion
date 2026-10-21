@@ -880,7 +880,64 @@ check("hooks/agent-status.sh keeps each session's latest state and deletes it wh
     if !loadAgentSessions(dir: data + "/agents").isEmpty { return "ended should delete it" }
     try run(["codex", "waiting"], "not json")
     try run(["someone", "waiting"], event)
-    return loadAgentWaits(dir: data + "/agents").isEmpty ? nil : "bad input or agent wrote a file"
+    if !loadAgentWaits(dir: data + "/agents").isEmpty { return "bad input or agent wrote a file" }
+    let errors = (try? String(contentsOfFile: data + "/hook-errors.log", encoding: .utf8)) ?? ""
+    if !errors.contains("codex waiting: no session id") || !errors.contains("someone waiting: unknown agent") {
+        return "bail-outs should be logged: \(errors)"
+    }
+
+    // E12.1: Antigravity sends camelCase fields and needs a JSON object back.
+    func stdout(_ args: [String], _ stdin: String) throws -> String {
+        let p = Process()
+        p.executableURL = projectDir.appendingPathComponent("hooks/agent-status.sh")
+        p.arguments = args
+        p.environment = ["THE_LIST_DATA_DIR": data, "PATH": "/usr/bin:/bin"]
+        let input = Pipe(), output = Pipe()
+        p.standardInput = input
+        p.standardOutput = output
+        try p.run()
+        input.fileHandleForWriting.write(Data(stdin.utf8))
+        try input.fileHandleForWriting.close()
+        let out = output.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        return String(decoding: out, as: UTF8.self)
+    }
+    let ag = #"{"conversationId":"c-1","workspacePaths":["/x/repo"],"fullyIdle":false,"terminationReason":"NO_TOOL_CALL"}"#
+    if try stdout(["antigravity", "stop"], ag) != "{}\n" { return "antigravity must get {} back" }
+    var a = loadAgentSessions(dir: data + "/agents")
+    if a.map(\.state) != [.working] || a[0].agentName != "Antigravity" || a[0].project != "repo" {
+        return "stop with background work is working: \(a)"
+    }
+    _ = try stdout(["antigravity", "stop"], ag.replacingOccurrences(of: "false", with: "true"))
+    a = loadAgentSessions(dir: data + "/agents")
+    if a.map(\.state) != [.finished] { return "stop when idle is finished: \(a)" }
+    _ = try stdout(["antigravity", "stop"], #"{"conversationId":"c-1","terminationReason":"MAX_TOKEN_BUDGET_EXCEEDED"}"#)
+    if loadAgentSessions(dir: data + "/agents").map(\.state) != [.limited] { return "out of budget is limited" }
+    if try stdout(["claude", "working"], event) != "" { return "claude and codex hooks print nothing" }
+    return nil
+}
+
+print("When agents finish (E12.2):")
+
+check("AfterAgentsClock: counts down only after work, any work resets it, long silent work stays busy") {
+    let t0 = ISO8601DateFormatter().date(from: "2026-10-19T12:00:00Z")!
+    func s(_ state: AgentWait.State, minutesAgo: Double = 0) -> AgentWait {
+        AgentWait(agent: "claude", session: UUID().uuidString, state: state, reason: "", cwd: "",
+                  since: t0.addingTimeInterval(-minutesAgo * 60), path: "")
+    }
+    var clock = AfterAgentsClock()
+    clock.update([], now: t0)
+    clock.update([s(.finished)], now: t0)
+    if clock.remaining(now: t0) != nil || clock.due(now: t0.addingTimeInterval(3600)) { return "nothing worked yet" }
+    clock.update([s(.working, minutesAgo: 40), s(.finished)], now: t0)
+    if !clock.sawWork || clock.remaining(now: t0) != nil { return "a 40-minute-old working session is still busy" }
+    clock.update([s(.finished), s(.waiting), s(.limited)], now: t0)
+    if clock.remaining(now: t0) != afterAgentsGrace || clock.due(now: t0.addingTimeInterval(60)) { return "countdown starts" }
+    clock.update([], now: t0.addingTimeInterval(30))
+    if clock.doneSince != t0 { return "later reloads keep the start" }
+    if !clock.due(now: t0.addingTimeInterval(afterAgentsGrace)) { return "due after the grace" }
+    clock.update([s(.working)], now: t0.addingTimeInterval(90))
+    return clock.remaining(now: t0.addingTimeInterval(200)) == nil ? nil : "new work cancels the countdown"
 }
 
 print("Stickman poses (E11):")

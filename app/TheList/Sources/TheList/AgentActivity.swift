@@ -2,9 +2,10 @@ import Foundation
 import Observation
 import TheListCore
 
-/// E10.1, E11: what Claude Code and Codex are doing, from the files hooks/agent-status.sh writes
-/// into `agentsDir()`, plus Codex's usage limit from its session logs. Drives the yellow dot, the
-/// popover's "Waiting on you" list and the two stickmen.
+/// E10.1, E11, E12: what Claude Code, Codex and Antigravity are doing, from the files
+/// hooks/agent-status.sh writes into `agentsDir()`, plus Codex's usage limit from its session logs.
+/// Drives the yellow dot, the popover's "Waiting on you" list, the two stickmen and "When agents
+/// finish".
 @MainActor
 @Observable
 final class AgentActivity {
@@ -18,6 +19,8 @@ final class AgentActivity {
     @ObservationIgnored private var codexLimit: AgentLimit?
     @ObservationIgnored private var watcher: DirectoryWatcher?
     @ObservationIgnored private var timer: Timer?
+    /// E12.2: every reload's sessions, for "When agents finish".
+    @ObservationIgnored var onReload: @MainActor ([AgentWait]) -> Void = { _ in }
 
     init(dir: String, codexSessions: String = NSHomeDirectory() + "/.codex/sessions") {
         self.dir = dir
@@ -56,6 +59,7 @@ final class AgentActivity {
         set(\.waits, agentWaits(sessions))
         set(\.claude, agentPose(agent: "claude", sessions: sessions, now: now))
         set(\.codex, agentPose(agent: "codex", sessions: sessions, limit: codexLimit, now: now))
+        onReload(sessions)
     }
 
     private func readCodexLimit() {
