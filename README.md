@@ -100,7 +100,10 @@ They're drawn as a handful of lines, with no images. The scene redraws 12 times 
 cd app/TheList
 ./build-app.sh                  # builds build/The Companion.app (release) with its icon, signed for this Mac only
 open "build/The Companion.app"  # starts it in the menu bar; Quit is in the popover footer
+./build-app.sh --install        # builds, copies it to ~/Applications, and restarts it from there
 ```
+
+**Open at login** (footer, next to Quit) starts the app when I log in, through `SMAppService`. It's off until I tick it, and it points at whichever copy was running when I ticked it, so use the `~/Applications` one. Every rebuild replaces and re-signs the app, which can drop the login item. The app remembers the choice in its defaults (`openAtLogin`) and registers itself again at launch. It shows in System Settings → General → Login Items & Extensions. If it's quit, ⌘Space → "Companion" brings it back, or drag `~/Applications/The Companion.app` to the Dock for one click.
 
 The app reads `data/TODO.md` (the path is baked into the bundle at build time). To point it somewhere else, launch it with `open --env THE_LIST_TODO_PATH=/path/to/TODO.md "build/The Companion.app"`. To see the popover without clicking, `$(swift build --show-bin-path)/TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark]` draws it to a PNG (add `--show-done` to open the Done section, `--group <id>` to show one group, `--agent-on` to show Saiyan mode switched on). `$(swift build --show-bin-path)/TheList --selftest` runs the popover's actions (tick, untick, move, quick-add, an outside edit) through the real store against a scratch list, and Saiyan mode against a fake that never touches power settings. The app logs each reload under the subsystem `com.jbanayo.thelist`.
 

@@ -28,6 +28,7 @@ struct TheListApp: App {
     @State private var activity: AgentActivity
     @State private var agent: AgentMode
     @State private var after: AfterAgents
+    @State private var login: LoginItem
 
     init() {
         let agent = AgentMode()
@@ -39,6 +40,9 @@ struct TheListApp: App {
         _activity = State(initialValue: activity)
         _agent = State(initialValue: agent)
         _after = State(initialValue: after)
+        let login = LoginItem()
+        login.refresh()
+        _login = State(initialValue: login)
     }
 
     var body: some Scene {
@@ -68,6 +72,8 @@ struct TheListApp: App {
                 dismissWait: activity.dismiss,
                 claude: activity.claude,
                 codex: activity.codex,
+                loginOn: login.isOn,
+                setLogin: login.setOn,
                 quit: {
                     agent.shutdown()
                     NSApplication.shared.terminate(nil)
@@ -75,8 +81,8 @@ struct TheListApp: App {
                 openURL: store.openURL,
                 reveal: store.reveal,
                 todoPath: store.todoPath,
-                message: agent.message ?? store.message,
-                messageIsError: agent.message != nil || store.messageIsError
+                message: agent.message ?? login.message ?? store.message,
+                messageIsError: agent.message != nil || login.message != nil || store.messageIsError
             ))
         } label: {
             Image(nsImage: MenuBarIcon.image(

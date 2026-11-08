@@ -299,7 +299,7 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 
 ### E7.4 Launch at login · S · **Haiku** · [A1]
 *As me, I want The List running whenever my Mac is on.*
-- [ ] A "Launch at login" option (off by default) using `SMAppService`.
+- [x] A "Launch at login" option (off by default) using `SMAppService`. *Done 2026-11-08: "Open at login" in the footer; `build-app.sh --install` puts the app in `~/Applications`.*
 
 ### E7.5 Desktop widget (optional) · M · **Sonnet** · [§6.4 optional]
 *As me, I want my top tasks visible on the desktop without clicking anything.*

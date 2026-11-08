@@ -33,6 +33,9 @@ struct PopoverActions {
     var claude: AgentPose = .sitting
     var codex: AgentPose = .sitting
     var sceneLive = true
+    /// E7.4: open the app when I log in.
+    var loginOn = false
+    var setLogin: @MainActor (Bool) -> Void = { _ in }
     var quit: @MainActor () -> Void = {}
     var openURL: @MainActor (URL) -> Void = { _ in }
     var reveal: @MainActor (String) -> Void = { _ in }
@@ -399,6 +402,13 @@ struct PopoverView: View {
                     .accessibilityAddTraits(.isButton)
                     .help("Copy open tasks into Apple Reminders, one list per group. Running it again updates them.")
             }
+            Text(actions.loginOn ? "✓ Open at login" : "Open at login")
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+                .onTapGesture { actions.setLogin(!actions.loginOn) }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityValue(actions.loginOn ? "On" : "Off")
+                .help("Start The Companion when you log in to this Mac.")
             Text("Quit")
                 .foregroundStyle(.secondary)
                 .contentShape(Rectangle())
