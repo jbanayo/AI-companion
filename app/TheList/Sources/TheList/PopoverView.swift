@@ -6,7 +6,10 @@ struct PopoverActions {
     var toggle: @MainActor (ItemView) -> Void = { _ in }
     var open: @MainActor (ItemView) -> Void = { _ in }
     var move: @MainActor (ItemView, Priority) -> Void = { _, _ in }
-    var add: @MainActor (String, @escaping @MainActor (Bool) -> Void) -> Void = { _, done in done(false) }
+    /// E5.4: hands back the new task's id, or nil if nothing was added.
+    var add: @MainActor (String, @escaping @MainActor (String?) -> Void) -> Void = { _, done in done(nil) }
+    /// E5.6: the details form's save. `done(true)` once it's in the file.
+    var update: @MainActor (ItemView, UpdateFields, @escaping @MainActor (Bool) -> Void) -> Void = { _, _, done in done(false) }
     /// E8.2–E8.3: show a group, put a task in one (nil takes its `group` key off), make a new one.
     var selectFilter: @MainActor (GroupFilter) -> Void = { _ in }
     var setGroup: @MainActor (ItemView, String?) -> Void = { _, _ in }
@@ -45,7 +48,7 @@ struct PopoverActions {
 }
 
 /// The popover: a group picker (E8.2), quick-add (E5.4), the four priority groups (E4.3), a
-/// collapsible Done section (E5.1), and a task's details when one is clicked.
+/// collapsible Done section (E5.1), a task's details when one is clicked, and the details form (E5.6).
 struct PopoverView: View {
     let snapshot: ListSnapshot
     let today: String
@@ -56,6 +59,10 @@ struct PopoverView: View {
     @State var showDone = false
     /// The task whose details are showing, by `key(_:)`; nil shows the list.
     @State var selected: String?
+    /// The task in the details form (E5.6), by `key(_:)`. Closing it goes back to whatever showed before.
+    @State var editing: String?
+    /// The last quick-add, offering "Add details" for a few seconds.
+    @State var added: AddedNote?
     @State private var draft = ""
     @State private var adding = false
     /// Naming a new group in the header (E8.3).
@@ -69,9 +76,15 @@ struct PopoverView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let item = selectedItem {
+            if let item = item(editing) {
                 fitting {
-                    DetailView(item: item, today: today, group: snapshot.group(of: item), actions: actions) { selected = nil }
+                    EditView(item: item, today: today, snapshot: snapshot, heading: selected == nil ? "Add details" : "Edit task",
+                             actions: actions) { editing = nil }
+                }
+            } else if let item = selectedItem {
+                fitting {
+                    DetailView(item: item, today: today, group: snapshot.group(of: item), actions: actions,
+                               edit: { editing = Self.key(item) }) { selected = nil }
                 }
             } else {
                 header
@@ -101,9 +114,11 @@ struct PopoverView: View {
     static func key(_ item: ItemView) -> String { item.id ?? "title:\(item.title)" }
 
     /// Looked up fresh each time, so the details follow the task through edits and moves.
-    private var selectedItem: ItemView? {
-        guard let selected else { return nil }
-        return (snapshot.groups.flatMap(\.items) + snapshot.done).first { Self.key($0) == selected }
+    private var selectedItem: ItemView? { item(selected) }
+
+    private func item(_ key: String?) -> ItemView? {
+        guard let key else { return nil }
+        return (snapshot.groups.flatMap(\.items) + snapshot.done).first { Self.key($0) == key }
     }
 
     private func select(_ item: ItemView) { selected = Self.key(item) }
@@ -191,19 +206,58 @@ struct PopoverView: View {
     }
 
     private var quickAdd: some View {
-        TextField("Add a task", text: $draft)
-            .textFieldStyle(.roundedBorder)
-            .disabled(adding)
-            .onSubmit {
-                guard !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                adding = true
-                actions.add(draft) { added in
-                    if added { draft = "" }
-                    adding = false
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("Add a task", text: $draft)
+                .textFieldStyle(.roundedBorder)
+                .disabled(adding)
+                .onSubmit {
+                    guard !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                    adding = true
+                    let title = draft
+                    actions.add(title) { id in
+                        if let id {
+                            draft = ""
+                            offerDetails(AddedNote(id: id, title: title))
+                        }
+                        adding = false
+                    }
                 }
-            }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 10)
+            if let added { addedRow(added) }
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
+    }
+
+    /// E5.6: shows "Add details" for a few seconds. A newer add replaces it.
+    private func offerDetails(_ note: AddedNote) {
+        added = note
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(6))
+            if added == note { added = nil }
+        }
+    }
+
+    private func addedRow(_ note: AddedNote) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            Text("Added \u{201C}\(note.title.trimmingCharacters(in: .whitespacesAndNewlines))\u{201D}")
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 4)
+            Text("Add details \u{2192}")
+                .foregroundStyle(Color.accentColor)
+                .fixedSize()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    editing = note.id
+                    added = nil
+                }
+                .accessibilityAddTraits(.isButton)
+                .help("Set a due date, priority, group, project, link or note")
+        }
+        .font(.caption)
+        .padding(.horizontal, 2)
     }
 
     private var list: some View {
@@ -548,4 +602,10 @@ private struct ItemRow: View {
         if item.meta["due"] == today { return .orange }
         return .secondary
     }
+}
+
+/// E5.6: the task a quick-add just made. `id` is also its `PopoverView.key(_:)`.
+struct AddedNote: Equatable {
+    let id: String
+    let title: String
 }

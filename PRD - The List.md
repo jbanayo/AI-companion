@@ -141,7 +141,7 @@ The app re-sorts automatically when a due date passes: an overdue P1 is shown as
 | A4 | Clicking an item shows its details in the popover: title, note and body lines, priority, due date, and when it was added and by whom. The details have buttons that fit the link: Open link; Open in VS Code and Show in Finder; Open and Show in Finder for a local file; or Open in TODO.md when there's no link. Right-click keeps a direct Open. *(Changed 2026-09-29: it used to open the link straight away.)* |
 | A5 | A checkbox marks the item done. Changing priority uses a right-click menu or drag. |
 | A6 | The app watches the file (FSEvents) and updates within 1 second of any external write. |
-| A7 | A quick-add field at the top for manual entry. It defaults to P2. |
+| A7 | A quick-add field at the top for manual entry. It defaults to P2. After adding, it offers **Add details** to set the due date, priority, group, project, link and note *(added 2026-11-09)*. The same form edits any task from its details view. |
 | A8 | Settings: file location, launch at login, pet on/off, pet position, archive window, **proactive suggestions on/off** (C9). |
 | A9 | Budget: under 50 MB RAM idle, ~0% CPU idle, app bundle under 20 MB. |
 | A10 | **Groups** *(added 2026-10-01)*. A menu in the popover header switches between All, each group (e.g. BYC, Personal projects), and Ungrouped. Groups live in `data/settings.json`, and each group lists the projects it covers, so a task tagged `project:prismo` shows under BYC without a `group` key. A task's own `group` key overrides its project. The menu can add a new group. Right-click a task to move it to another group. Quick-add files a task in the group showing. The menu bar badge always counts every group. |

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import TheListCore
 
-/// `TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark] [--show-done] [--detail "task title"] [--group id] [--agent-on] [--waiting] [--claude running|sitting|lying] [--codex running|sitting|lying] [--armed off|sleep|shutdown] [--countdown]`
+/// `TheList --render out.png [--todo path] [--today YYYY-MM-DD] [--dark] [--show-done] [--detail "task title"] [--edit "task title"] [--added "task title"] [--group id] [--agent-on] [--waiting] [--claude running|sitting|lying] [--codex running|sitting|lying] [--armed off|sleep|shutdown] [--countdown]`
 /// Draws the popover and the menu bar icon for a TODO.md into PNGs without launching the app,
 /// so layout can be checked from the command line.
 enum Render {
@@ -51,16 +51,20 @@ enum Render {
         let filter = value("--group").map(GroupFilter.init(storageKey:)) ?? .all
         let snapshot = makeSnapshot(parseDocument(bytes), today: today, groups: groups, filter: filter)
 
-        let detail = value("--detail").flatMap { title in
-            (snapshot.groups.flatMap(\.items) + snapshot.done).first { $0.title == title }.map(PopoverView.key)
+        func find(_ flag: String) -> ItemView? {
+            value(flag).flatMap { title in (snapshot.groups.flatMap(\.items) + snapshot.done).first { $0.title == title } }
         }
+        let detail = find("--detail").map(PopoverView.key)
+        // E5.6: the details form, and the "Add details" note after a quick-add.
+        let editing = find("--edit").map(PopoverView.key)
+        let added = find("--added").map { AddedNote(id: PopoverView.key($0), title: $0.title) }
         let popover = PopoverView(
             snapshot: snapshot, today: today, actions: PopoverActions(
                 agentOn: agentOn, agentLid: agentOn, afterAction: armed, afterBusy: busy,
                 afterRemaining: args.contains("--countdown") ? 112 : nil, waits: waits, claude: pose("--claude"), codex: pose("--codex"),
                 sceneLive: false, todoPath: todoPath
             ), scrollable: false,
-            showDone: args.contains("--show-done"), selected: detail
+            showDone: args.contains("--show-done"), selected: detail, editing: editing, added: added
         )
             .background(dark ? Color(white: 0.16) : Color(white: 0.97))
             .environment(\.colorScheme, dark ? .dark : .light)

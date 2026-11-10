@@ -146,8 +146,9 @@ final class ListStore {
         }
     }
 
-    /// E5.4. Calls `done(true)` once the item is in the file. Files it in the group showing, if any.
-    func add(_ title: String, done: @escaping @MainActor (Bool) -> Void) {
+    /// E5.4. Calls `done` with the new id once the item is in the file (nil if it wasn't added).
+    /// Files it in the group showing, if any.
+    func add(_ title: String, done: @escaping @MainActor (String?) -> Void) {
         let path = todoPath, today = today
         let group: String? = if case let .group(id) = snapshot.filter { id } else { nil }
         Task.detached {
@@ -155,15 +156,22 @@ final class ListStore {
                 let id = try quickAdd(todoPath: path, title: title, group: group, today: today)
                 await MainActor.run {
                     self.reload()
-                    done(id != nil)
+                    done(id)
                 }
             } catch {
                 await MainActor.run {
                     self.show("Couldn't add: \(error)")
-                    done(false)
+                    done(nil)
                 }
             }
         }
+    }
+
+    /// E5.6: the details form. Calls `done(true)` only once the change is in the file, so the form
+    /// stays open (with the footer saying why) if the write failed or the list changed underneath.
+    func update(_ item: ItemView, _ fields: UpdateFields, done: @escaping @MainActor (Bool) -> Void) {
+        let ref = ItemRef(item), path = todoPath
+        write({ try updateItem(todoPath: path, ref, fields) }, then: done)
     }
 
     /// E5.2: open the item's link, or TODO.md at its line.
@@ -182,7 +190,8 @@ final class ListStore {
 
     /// Runs a write off the main thread (the lock can wait up to 3 s), then refreshes right away
     /// rather than waiting for the watcher.
-    private func write(_ action: @escaping @Sendable () throws -> ActionResult) {
+    private func write(_ action: @escaping @Sendable () throws -> ActionResult,
+                       then done: (@MainActor (Bool) -> Void)? = nil) {
         Task.detached {
             let outcome: Result<ActionResult, Error> = Result { try action() }
             await MainActor.run {
@@ -192,6 +201,7 @@ final class ListStore {
                 case .success(.listChanged): self.show("The list changed underneath. Try again.")
                 case let .failure(error): self.show("Couldn't save: \(error)")
                 }
+                if case .success(.done) = outcome { done?(true) } else { done?(false) }
             }
         }
     }

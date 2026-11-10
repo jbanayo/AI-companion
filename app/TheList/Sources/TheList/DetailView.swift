@@ -9,21 +9,30 @@ struct DetailView: View {
     /// The task's effective group (E8.1), shown as a chip.
     var group: TaskGroup?
     let actions: PopoverActions
+    /// E5.6: opens the details form.
+    let edit: () -> Void
     let back: () -> Void
 
     private var target: LinkTarget { linkTarget(for: item, todoPath: actions.todoPath) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 4) {
-                Image(systemName: "chevron.left").font(.subheadline.weight(.semibold))
-                Text("The List").font(.subheadline)
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left").font(.subheadline.weight(.semibold))
+                    Text("The List").font(.subheadline)
+                }
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: back)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel("Back to the list")
+                Spacer()
+                Button("Edit", systemImage: "pencil", action: edit)
+                    .buttonStyle(.borderless)
+                    .font(.subheadline)
+                    .help("Change the title, priority, due date, group, project, link or note")
             }
-            .foregroundStyle(.secondary)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: back)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityLabel("Back to the list")
             .padding(.horizontal, 14)
             .padding(.top, 10)
             .padding(.bottom, 8)
@@ -88,7 +97,7 @@ struct DetailView: View {
     private var context: some View {
         let text = ([item.meta["note"]].compactMap { $0 } + item.body).joined(separator: "\n")
         if text.isEmpty {
-            Text("No notes. Add some under the task in TODO.md.")
+            Text("No notes. Click Edit to add one.")
                 .font(.callout)
                 .foregroundStyle(.tertiary)
         } else {

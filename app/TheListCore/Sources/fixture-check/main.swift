@@ -667,6 +667,47 @@ check("quick-add adds at P2 with src:manual; a blank title does nothing") {
     return diff("after blank", before, try read(path))
 }
 
+check("details form: a hand-typed item gets every field set and moves heading in one write") {
+    let path = try tempTodoPath()
+    try write(path, "# Todo\n\n## P1 — This week\n\n## P2 — Soon\n- [ ] Typed by hand\n")
+    let r = try ref(path, title: "Typed by hand")
+    let fields = UpdateFields(title: "Typed, then detailed", priority: .p1, due: .set("2026-10-02"), project: .set("prismo"),
+                              group: .set("byc"), link: .set("https://example.com/x"), note: .set("ask about\nlogos"))
+    guard try updateItem(todoPath: path, r, fields) == .done else { return "update refused" }
+    let item = deriveViews(try readTodoFile(at: path)).items.first!
+    guard let id = item.id else { return "no id assigned" }
+    return diff("file", "# Todo\n\n## P1 — This week\n- [ ] Typed, then detailed {id:\(id) due:2026-10-02 project:prismo group:byc link:https://example.com/x note:\"ask about logos\"}\n\n## P2 — Soon\n", try read(path))
+}
+
+check("details form: a cleared field is removed and untouched ones stay") {
+    let path = try tempTodoPath()
+    try write(path, "# Todo\n\n## P2 — Soon\n- [ ] Task A {id:t_a due:2026-10-02 project:prismo src:manual}\n")
+    try updateItem(todoPath: path, ref(path, title: "Task A"), UpdateFields(due: .remove))
+    return diff("file", "# Todo\n\n## P2 — Soon\n- [ ] Task A {id:t_a project:prismo src:manual}\n", try read(path))
+}
+
+check("details form: a stale ref is refused") {
+    let path = try tempTodoPath()
+    try write(path, "# Todo\n\n## P2 — Soon\n- [ ] Gone soon {id:t_g}\n")
+    let gone = try ref(path, title: "Gone soon")
+    try write(path, "# Todo\n\n## P2 — Soon\n")
+    return try updateItem(todoPath: path, gone, UpdateFields(due: .set(monday))) == .listChanged ? nil : "expected listChanged"
+}
+
+check("day helpers: shift, next weekday, and a picker date round-trip") {
+    if let d = diff("shift", "2026-10-01 2026-12-31 2027-01-01", [shiftDay("2026-09-30", by: 1), shiftDay("2026-12-30", by: 1), shiftDay("2026-12-31", by: 1)].map { $0 ?? "nil" }.joined(separator: " ")) { return d }
+    if shiftDay("2026-02-30", by: 1) != nil { return "shifted a date that isn't real" }
+    // monday is 2026-09-28: next Monday is a week on, next Friday is that week's.
+    if let d = diff("weekday", "2026-10-05 2026-10-02", "\(nextWeekday(2, after: monday) ?? "nil") \(nextWeekday(6, after: monday) ?? "nil")") { return d }
+    for zone in ["Asia/Manila", "America/Los_Angeles", "Pacific/Kiritimati"] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: zone)!
+        guard let date = localDate("2026-10-02", calendar: cal) else { return "\(zone): no date" }
+        if let d = diff("round-trip in \(zone)", "2026-10-02", today(date, calendar: cal)) { return d }
+    }
+    return nil
+}
+
 // MARK: - Groups (E8.1–E8.3)
 
 print("Groups:")

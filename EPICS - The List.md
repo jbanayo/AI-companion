@@ -229,6 +229,14 @@ If you agree, update PRD §6.1 to `AI Companion/data/TODO.md`. The stories below
 - The link kinds and Finder paths are handled by `linkTarget(for:todoPath:)` in `TheListCore`, checked in `fixture-check`. All five kinds were rendered with `TheList --render … --detail "<title>"` in light and dark.
 - Right-click still offers a direct **Open**, plus **Show Details**.
 
+### E5.6 Add details after quick-add · M · **Opus** · [A7, added 2026-11-09]
+*As me, I want to add a task with just a title, then fill in when it's due, its priority, group and the rest if I want to.*
+- [x] Quick-add still saves on Enter. A line under the field then reads **Added "…" · Add details →** for 6 seconds. A newer add replaces it, so typing several tasks in a row isn't slowed down.
+- [x] **Add details** opens a form with the same fields Claude sets: title, priority (Now / Week / Soon / Someday), due date (Today, Tomorrow, Next Mon, or a date picker; × clears it), group (with "Auto: BYC (from project)" when the project already maps to one), project (with suggestions from the groups and existing tasks), link and note.
+- [x] The task's details view has an **Edit** button that opens the same form, so any task can be changed without opening TODO.md.
+- [x] Save (Enter or the button) writes only the fields that changed; a cleared field drops its key. Cancel or Esc leaves the task alone. If the task changed underneath, the form stays open and the footer says so. Lines written under a task in TODO.md aren't editable here, and the form says so.
+- Covered by `updateItem` and the day helpers in `fixture-check`, and the store's `add`/`update` in `TheList --selftest`. Rendered with `TheList --render … --edit "<title>"` and `--added "<title>"` in light and dark.
+
 **Still needs a human look:** typing in the field, right-click, clicking a task, and the details view's buttons in the real popover. macOS blocks screenshots from Claude's process, so these were tested through the store, not by clicking.
 
 > **Checkpoint — M2 done.** Daily driver: I no longer open the `.md` file directly.

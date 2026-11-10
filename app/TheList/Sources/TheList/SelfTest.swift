@@ -70,15 +70,53 @@ enum SelfTest {
             group(of: "Ask Raph for logos") == .p3 && file().contains("## P3 — Someday\n- [ ] Ask Raph for logos")
         }
 
-        var added: Bool?
+        var added: String??
         store.add("Quick one") { added = $0 }
-        await expect("quick-add: shows under Soon with src:manual") {
-            added == true && group(of: "Quick one") == .p2 && file().contains("Quick one {id:") && file().contains("src:manual}")
+        await expect("quick-add: shows under Soon with src:manual, and hands back its id") {
+            guard case let .some(.some(id)) = added else { return false }
+            return item("Quick one")?.id == id && group(of: "Quick one") == .p2
+                && file().contains("Quick one {id:\(id) ") && file().contains("src:manual}")
         }
 
-        var blank: Bool?
+        var blank: String??
         store.add("   ") { blank = $0 }
-        await expect("quick-add: a blank title reports nothing added") { blank == false }
+        await expect("quick-add: a blank title reports nothing added") { blank == .some(nil) }
+
+        // E5.6: the details form after a quick-add.
+        var saved: Bool?
+        store.add("Detail me") { _ in }
+        await expect("quick-add for the details form") { item("Detail me") != nil }
+        let later = shiftDay(store.today, by: 30)!
+        store.update(item("Detail me")!, UpdateFields(priority: .p1, due: .set(later), project: .set("solomon"),
+                                                      link: .set("https://example.com"), note: .set("bring the deck"))) { saved = $0 }
+        await expect("details form: fields saved, moved to This week, BYC via its project") {
+            let line = file().split(separator: "\n").first { $0.contains("Detail me") } ?? ""
+            return saved == true && group(of: "Detail me") == .p1
+                && store.snapshot.group(of: item("Detail me")!)?.id == "byc"
+                && line.contains("due:\(later)") && line.contains("project:solomon")
+                && line.contains("link:https://example.com") && line.contains("note:\"bring the deck\"")
+        }
+
+        saved = nil
+        store.update(item("Detail me")!, UpdateFields(title: "Detailed", due: .remove)) { saved = $0 }
+        await expect("details form: renamed, due date cleared, the rest kept") {
+            let line = file().split(separator: "\n").first { $0.contains("Detailed") } ?? ""
+            return saved == true && item("Detail me") == nil && !line.contains("due:") && line.contains("project:solomon")
+        }
+
+        saved = nil
+        let stale = item("Detailed")!
+        // Let the watcher settle after the app's own write first: an outside edit within ~100 ms
+        // of one can be missed until the next change (a known watcher gap, not what's tested here).
+        try? await Task.sleep(for: .milliseconds(300))
+        let kept = file().split(separator: "\n", omittingEmptySubsequences: false).filter { !$0.contains("Detailed") }
+        try! Data(kept.joined(separator: "\n").utf8).write(to: URL(fileURLWithPath: path))
+        await expect("an outside delete shows up") { item("Detailed") == nil }
+        let before = file()
+        store.update(stale, UpdateFields(due: .set("2026-10-09"))) { saved = $0 }
+        await expect("details form: a task that changed underneath reports not saved and is left alone") {
+            saved == false && file() == before
+        }
 
         // An outside edit (a hand-typed line with no id), then tick it from the app.
         try! Data((file() + "- [ ] Typed in VS Code\n").utf8).write(to: URL(fileURLWithPath: path))

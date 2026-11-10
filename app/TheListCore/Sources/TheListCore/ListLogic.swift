@@ -26,6 +26,31 @@ func daysBetween(_ a: String, _ b: String) -> Int? {
     return utc.dateComponents([.day], from: da, to: db).day
 }
 
+private func dayString(_ date: Date) -> String {
+    let c = utc.dateComponents([.year, .month, .day], from: date)
+    return String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
+}
+
+/// E5.6: `day` moved by `n` days, or nil if it isn't a real date.
+public func shiftDay(_ day: String, by n: Int) -> String? {
+    guard let date = dayDate(day), let moved = utc.date(byAdding: .day, value: n, to: date) else { return nil }
+    return dayString(moved)
+}
+
+/// E5.6: the first `weekday` (1 = Sunday … 7 = Saturday) after `day`, never `day` itself.
+public func nextWeekday(_ weekday: Int, after day: String) -> String? {
+    guard let date = dayDate(day) else { return nil }
+    let ahead = (weekday - utc.component(.weekday, from: date) + 7) % 7
+    return shiftDay(day, by: ahead == 0 ? 7 : ahead)
+}
+
+/// E5.6: noon local time on `day`, for a date picker; `today(_:)` turns it back into the day.
+public func localDate(_ day: String, calendar: Calendar = .current) -> Date? {
+    guard let date = dayDate(day) else { return nil }
+    let c = utc.dateComponents([.year, .month, .day], from: date)
+    return calendar.date(from: DateComponents(year: c.year, month: c.month, day: c.day, hour: 12))
+}
+
 /// A well-formed, real date. Malformed dates are ignored by sorting and overdue checks (spec §2.6).
 public func isValidDate(_ s: String) -> Bool { dayDate(s) != nil }
 

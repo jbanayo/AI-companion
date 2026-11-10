@@ -64,6 +64,12 @@ public func setGroup(todoPath: String, _ ref: ItemRef, _ groupId: String?) throw
     }
 }
 
+/// E5.6: change any of a task's fields at once (the popover's details form).
+@discardableResult
+public func updateItem(todoPath: String, _ ref: ItemRef, _ fields: UpdateFields) throws -> ActionResult {
+    try act(todoPath, ref) { doc, id in updateTodo(doc, id: id, fields) }
+}
+
 /// E5.4: quick-add as P2 with `src:manual`. No duplicate check: a hand-typed add is deliberate.
 /// E8.2: `group` files it in the group the popover is showing.
 /// Returns the new id, or nil if the title is blank.

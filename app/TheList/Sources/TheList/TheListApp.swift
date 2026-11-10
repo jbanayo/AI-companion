@@ -52,6 +52,7 @@ struct TheListApp: App {
                 open: store.open,
                 move: store.move,
                 add: store.add,
+                update: store.update,
                 selectFilter: { store.filter = $0 },
                 setGroup: store.setGroup,
                 addGroup: store.addGroup,
